@@ -231,15 +231,18 @@ PostgreSQL tables (hosted on Supabase):
 
 ## 7. Environment Configuration
 
-Three environments with per-environment configuration:
+Two environments with per-environment configuration:
 
 | Environment | Frontend | Backend |
 |---|---|---|
 | Development | `localhost:3000` | `localhost:8000` |
-| Stage | — | `api-dev.reciclaplus.com` |
-| Production | — | `api.reciclaplus.com` |
+| Production | `reciclaplus.com` | `api.reciclaplus.com` |
 
-Per-environment variables: Firebase project ID, Google OAuth client credentials, OAuth redirect URI, CORS allowed origins, and cookie security flags (`Secure`, `SameSite`).
+Each environment uses its own Supabase project, keeping development and production data fully isolated.
+
+Per-environment variables: Supabase project URL and keys, Google OAuth client credentials, OAuth redirect URI, CORS allowed origins, and cookie security flags (`Secure`, `SameSite`).
+
+For pre-production testing of risky changes, use App Engine versions with traffic splitting rather than a standing staging environment.
 
 ---
 
