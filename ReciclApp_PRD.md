@@ -88,14 +88,14 @@ Explains how each section of the app works: List, Map, New Point, Pass Points, a
 ### 4.4 List — `/list`
 
 **Access:** `read`  
-Displays all registered pickup points in a filterable, searchable data grid. Columns: name, neighborhood (barrio), community, category, date added.
+Displays all registered pickup points in a filterable, searchable data grid. Columns: name, neighborhood, community, category, date added.
 
 ---
 
 ### 4.5 Map — `/map`
 
 **Access:** `read`  
-Interactive Google Map showing all pickup points as clustered markers. Clicking a marker displays point details. Supports filtering by barrio and category.
+Interactive Google Map showing all pickup points as clustered markers. Clicking a marker displays point details. Supports filtering by neighborhood and category.
 
 ---
 
@@ -104,35 +104,35 @@ Interactive Google Map showing all pickup points as clustered markers. Clicking 
 **Access:** `read`  
 Private analytics dashboard:
 - Collection time series by neighborhood (line chart)
-- Barrio distribution (pie chart)
+- Neighborhood distribution (pie chart)
 - Weekly weight by plastic type (bar chart)
 - Waste percentage breakdown
 - Recently added pickup points
 
 ---
 
-### 4.7 Weight Tracking — `/pesada`
+### 4.7 Weight Tracking — `/weights`
 
 **Access:** `write`  
-Weekly form to record plastic collected by weight category (PET, galones, plástico duro, basura). Inline data grid with create, edit, and delete capabilities.
+Weekly form to record plastic collected by weight category (PET, HDPE, PP, trash). Inline data grid with create, edit, and delete capabilities.
 
 ---
 
-### 4.8 New Pickup Point — `/newPdr`
+### 4.8 New Pickup Point — `/new-pdr`
 
 **Access:** `write`  
 Form to register a new PDR. Includes an embedded map picker for selecting coordinates, and fields for name, description, neighborhood, community, and category.
 
 ---
 
-### 4.9 Collection Pass — `/pasarPuntos`
+### 4.9 Collection Pass — `/collection-pass`
 
 **Access:** `write`  
 Weekly collection pass recording. Lists all active pickup points; the operator marks each as one of:
-- `sí` — plastic found and collected
-- `no` — no plastic found
-- `no disponible` — point unavailable
-- `cerrado` — point closed
+- `collected` — plastic found and collected
+- `empty` — no plastic found
+- `unavailable` — point unavailable
+- `closed` — point closed
 
 Records are keyed by ISO week (YYYYWW).
 
@@ -177,7 +177,7 @@ Login, logout, and token refresh are handled directly by the Supabase client —
 | `GET` | `/collections` | `read` | Recent collection records (`?limit=n`) |
 | `GET` | `/collections/{year}/{week}` | `read` | All PDR statuses for a given ISO week |
 | `POST` | `/collections/{year}/{week}` | `write` | Save collection pass for a week |
-| `GET` | `/collections/summary` | `read` | Historical records by neighborhood (`?group_by=barrio`) |
+| `GET` | `/collections/summary` | `read` | Historical records by neighborhood (`?group_by=neighborhood`) |
 
 ### 5.4 Weights
 
@@ -215,13 +215,13 @@ PostgreSQL tables (hosted on Supabase):
 
 | Table | Purpose | Key Fields |
 |---|---|---|
-| `pdrs` | Pickup points | `id`, `internal_id`, `nombre`, `barrio`, `comunidad`, `categoria`, `lat`, `lng`, `created_at` |
-| `collections` | Weekly collection records | `id`, `pdr_id` (FK), `year`, `week`, `value` (sí / no / no disponible / cerrado), `date` |
-| `weights` | Weight entries | `id`, `pet`, `galones`, `plasticoduro`, `basura`, `date` |
+| `pdrs` | Pickup points | `id`, `internal_id`, `name`, `neighborhood`, `community`, `category`, `lat`, `lng`, `created_at` |
+| `collections` | Weekly collection records | `id`, `pdr_id` (FK), `year`, `week`, `status` (collected / empty / unavailable / closed), `date` |
+| `weights` | Weight entries | `id`, `pet`, `hdpe`, `pp`, `trash`, `date` |
 | `users` | Platform users | `id`, `email`, `name`, `role`, `created_at`, `created_by` |
-| `towns` | Town configuration | `id`, `nombre`, `map_center_lat`, `map_center_lng` |
-| `communities` | Communities within a town | `id`, `town_id` (FK), `nombre` |
-| `barrios` | Neighbourhoods within a community | `id`, `community_id` (FK), `nombre` |
+| `towns` | Town configuration | `id`, `name`, `map_center_lat`, `map_center_lng` |
+| `communities` | Communities within a town | `id`, `town_id` (FK), `name` |
+| `neighborhoods` | Neighbourhoods within a community | `id`, `community_id` (FK), `name` |
 | `pdr_logs` | PDR audit trail | `id`, `pdr_id` (FK), `action`, `created_at` |
 | `activity_logs` | General user activity audit | `id`, `user_id` (FK), `action`, `resource_type`, `resource_id`, `created_at` |
 
