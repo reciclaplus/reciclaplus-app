@@ -5,8 +5,8 @@ Waste & recycling collection management platform for the Dominican Republic. Ful
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 18, Material-UI (MUI), MUI X Charts, Google Maps API
-- **Backend**: FastAPI (Python), Uvicorn/Gunicorn
-- **Database & Auth**: Supabase (PostgreSQL) with Google OAuth via Supabase Auth, sessions in HTTP-only cookies (`@supabase/ssr`)
+- **Backend**: FastAPI (Python 3.12), SQLAlchemy 2.0 + Alembic (direct Postgres connection to Supabase), Uvicorn/Gunicorn. Dependencies are managed with **uv** (`pyproject.toml` + `uv.lock`): use `uv sync`, `uv add <pkg>`, and `uv run <cmd>` — never pip directly.
+- **Database & Auth**: Supabase (PostgreSQL) with Google OAuth via Supabase Auth, cookie-based sessions (`@supabase/ssr`); the frontend sends a bearer token to FastAPI
 - **Hosting**: Google Cloud App Engine
 
 ## Repository Layout
@@ -25,17 +25,17 @@ backend/    FastAPI app
 - Never store Spanish strings in the database as data values (e.g. statuses are `collected`/`empty`/`unavailable`/`closed`, never `sí`/`no`).
 - Keep UI strings in a centralized location (not hardcoded inline) so they're easy to find and update.
 
-The one domain term that stays: **PDR** (*Punto de Recogida* — pickup point). It's the established name for pickup points and is used in code as `pdr`/`pdrs`.
+The one domain term that stays: **PDR** (_Punto de Recogida_ — pickup point). It's the established name for pickup points and is used in code as `pdr`/`pdrs`.
 
 ## Domain Glossary
 
-| Term | Meaning |
-|---|---|
-| PDR | Pickup point (Punto de Recogida) — a location where plastic is collected |
-| Collection pass | Weekly visit to all PDRs, recording a status per point |
-| Collection status | `collected`, `empty`, `unavailable`, `closed` |
-| Weight categories | `pet`, `hdpe`, `pp`, `trash` (plastic resin codes) |
-| ISO week key | Collections are keyed by year + ISO week number |
+| Term              | Meaning                                                                  |
+| ----------------- | ------------------------------------------------------------------------ |
+| PDR               | Pickup point (Punto de Recogida) — a location where plastic is collected |
+| Collection pass   | Weekly visit to all PDRs, recording a status per point                   |
+| Collection status | `collected`, `empty`, `unavailable`, `closed`                            |
+| Weight categories | `pet`, `hdpe`, `pp`, `trash` (plastic resin codes)                       |
+| ISO week key      | Collections are keyed by year + ISO week number                          |
 
 ## Roles & Access
 
@@ -48,7 +48,8 @@ Hierarchical roles: `read` < `write` < `admin`. Each inherits the lower role's p
 
 - The FastAPI backend is **stateless** — no server-side session storage. Auth state lives in Supabase JWT cookies.
 - Login/logout/refresh are handled by the Supabase client directly; the backend only verifies JWTs and exposes `GET /auth/me` for role lookup.
-- Auth tokens go in HTTP-only cookies **only** — never `localStorage`.
+- Auth sessions are cookie-based via `@supabase/ssr` — tokens never in `localStorage`. API calls carry `Authorization: Bearer <access_token>` from the Supabase session.
+- Database access is SQLAlchemy only (no `supabase-py` for data) — RLS is deny-all and the backend is the sole data gateway. Schema changes always go through Alembic migrations.
 - CORS origins are strictly whitelisted per environment — no wildcards in production.
 - All mutating actions (PDR create/update/delete, collection passes, weights, user management) must write to the `activity_logs` audit table.
 - Supabase is the single source of truth — no external file storage.
@@ -71,6 +72,7 @@ Hierarchical roles: `read` < `write` < `admin`. Each inherits the lower role's p
 Treat Next.js as a client-side SPA host. Its value in this project is the `@supabase/ssr` integration, which handles HTTP-only cookie sessions for the auth requirement — not SSR, static generation, or SEO (everything except `/` and `/info` is behind a login anyway).
 
 Practical rules:
+
 - Most components will be `"use client"` — that's fine and expected.
 - All data fetching goes through FastAPI. Do not use Next.js API routes (the FastAPI backend is the API).
 - Do not use Server Components, Server Actions, or server-side data fetching for application data — keep the data flow simple: client → FastAPI.
@@ -85,9 +87,9 @@ Practical rules:
 
 ## Environments
 
-| Environment | Frontend | Backend |
-|---|---|---|
-| Development | `localhost:3000` | `localhost:8000` |
-| Production | `reciclaplus.com` | `api.reciclaplus.com` |
+| Environment | Frontend          | Backend               |
+| ----------- | ----------------- | --------------------- |
+| Development | `localhost:3000`  | `localhost:8000`      |
+| Production  | `reciclaplus.com` | `api.reciclaplus.com` |
 
 Each environment has its own Supabase project — development never touches production data. Per-environment config (Supabase URL/keys, OAuth credentials, CORS origins, cookie flags) lives in environment variables — never committed.
