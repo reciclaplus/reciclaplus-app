@@ -2,8 +2,11 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+CollectionStatus = Literal["collected", "empty", "unavailable", "closed"]
 
 
 class UserMe(BaseModel):
@@ -77,3 +80,38 @@ class PdrOut(BaseModel):
     lat: float
     lng: float
     created_at: datetime
+
+
+# --- Collections (weekly pass) ---
+
+class IsoWeek(BaseModel):
+    """Current ISO year + week, for defaulting the collection pass page."""
+
+    year: int
+    week: int
+
+
+class CollectionPassRow(BaseModel):
+    """One PDR plus its recorded status for the requested week (None if not
+    yet recorded)."""
+
+    pdr_id: uuid.UUID
+    internal_id: int
+    name: str
+    community: str
+    neighborhood: str
+    category: str
+    status: CollectionStatus | None
+
+
+class CollectionEntry(BaseModel):
+    """A single PDR's status submitted in a collection pass."""
+
+    pdr_id: uuid.UUID
+    status: CollectionStatus
+
+
+class CollectionPassSave(BaseModel):
+    """Payload for saving a week's collection pass."""
+
+    entries: list[CollectionEntry]
