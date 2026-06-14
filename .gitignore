@@ -1,0 +1,10 @@
+# Environment / secrets (never commit)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# OS / editor
+.DS_Store
+Thumbs.db

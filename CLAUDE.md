@@ -4,8 +4,9 @@ Waste & recycling collection management platform for the Dominican Republic. Ful
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), React 18, Material-UI (MUI), MUI X Charts, Google Maps API
-- **Backend**: FastAPI (Python 3.12), SQLAlchemy 2.0 + Alembic (direct Postgres connection to Supabase), Uvicorn/Gunicorn. Dependencies are managed with **uv** (`pyproject.toml` + `uv.lock`): use `uv sync`, `uv add <pkg>`, and `uv run <cmd>` — never pip directly.
+- **Frontend**: Next.js 16 (App Router), React 19, Material-UI (MUI), MUI X Charts, Google Maps API
+- **Backend**: FastAPI (Python 3.12), SQLAlchemy 2.0 (direct Postgres connection to Supabase), Uvicorn/Gunicorn. Dependencies are managed with **uv** (`pyproject.toml` + `uv.lock`): use `uv sync`, `uv add <pkg>`, and `uv run <cmd>` — never pip directly.
+- **Migrations**: Supabase CLI migrations (SQL files in `supabase/migrations/`), applied with `supabase db push`. No Alembic. The SQL migration files are the source of truth for the schema; keep SQLAlchemy models in sync with them by hand.
 - **Database & Auth**: Supabase (PostgreSQL) with Google OAuth via Supabase Auth, cookie-based sessions (`@supabase/ssr`); the frontend sends a bearer token to FastAPI
 - **Hosting**: Google Cloud App Engine
 
@@ -49,7 +50,7 @@ Hierarchical roles: `read` < `write` < `admin`. Each inherits the lower role's p
 - The FastAPI backend is **stateless** — no server-side session storage. Auth state lives in Supabase JWT cookies.
 - Login/logout/refresh are handled by the Supabase client directly; the backend only verifies JWTs and exposes `GET /auth/me` for role lookup.
 - Auth sessions are cookie-based via `@supabase/ssr` — tokens never in `localStorage`. API calls carry `Authorization: Bearer <access_token>` from the Supabase session.
-- Database access is SQLAlchemy only (no `supabase-py` for data) — RLS is deny-all and the backend is the sole data gateway. Schema changes always go through Alembic migrations.
+- Database access is SQLAlchemy only (no `supabase-py` for data) — RLS is deny-all and the backend is the sole data gateway. Schema changes always go through Supabase CLI migrations (SQL files in `supabase/migrations/`).
 - CORS origins are strictly whitelisted per environment — no wildcards in production.
 - All mutating actions (PDR create/update/delete, collection passes, weights, user management) must write to the `activity_logs` audit table.
 - Supabase is the single source of truth — no external file storage.
