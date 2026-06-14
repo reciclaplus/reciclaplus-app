@@ -5,8 +5,10 @@ import { NextResponse, type NextRequest } from "next/server";
  * Refreshes the Supabase auth session on navigation and keeps the session
  * cookies in sync between the browser and the server. Required for the
  * @supabase/ssr cookie-based auth flow.
+ *
+ * (Next.js 16 "proxy" convention — formerly "middleware".)
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
