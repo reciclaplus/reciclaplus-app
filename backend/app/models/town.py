@@ -15,7 +15,7 @@ class Town(Base):
     __tablename__ = "towns"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     map_center_lat: Mapped[float] = mapped_column(Float, nullable=False)
@@ -34,7 +34,7 @@ class Community(Base):
     __table_args__ = (UniqueConstraint("town_id", "name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     town_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("towns.id", ondelete="CASCADE"), nullable=False
@@ -52,7 +52,7 @@ class Neighborhood(Base):
     __table_args__ = (UniqueConstraint("community_id", "name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     community_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

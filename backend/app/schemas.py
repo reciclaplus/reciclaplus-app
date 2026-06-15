@@ -115,3 +115,51 @@ class CollectionPassSave(BaseModel):
     """Payload for saving a week's collection pass."""
 
     entries: list[CollectionEntry]
+
+
+# --- Users & access management ---
+
+Role = Literal["read", "write", "admin"]
+
+
+class UserOut(BaseModel):
+    """An active (provisioned) platform user."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    name: str | None
+    role: Role
+    created_at: datetime
+
+
+class UserCreate(BaseModel):
+    """Create a user by email + role (active on first sign-in, matched by
+    email)."""
+
+    email: str = Field(min_length=3)
+    name: str | None = None
+    role: Role = "read"
+
+
+class UserUpdate(BaseModel):
+    """Update a user's role and/or name."""
+
+    name: str | None = None
+    role: Role
+
+
+# --- Town configuration (admin write) ---
+
+class TownWrite(BaseModel):
+    name: str = Field(min_length=1)
+    map_center_lat: float
+    map_center_lng: float
+    categories: list[str] = []
+
+
+class NameWrite(BaseModel):
+    """Create/rename a community or neighborhood."""
+
+    name: str = Field(min_length=1)

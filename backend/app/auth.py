@@ -11,7 +11,7 @@ from functools import lru_cache
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -73,15 +73,19 @@ def get_current_user(
 ) -> User:
     """Resolve the authenticated user from the bearer token.
 
-    Verifies the JWT, then loads the matching `users` row. A valid Supabase
-    identity that has not been provisioned in `users` is rejected (403).
+    Verifies the JWT, then matches the caller to a `users` row **by email**
+    (the verified email claim). Platform users are keyed by their own uuid and
+    are created directly by admins, so a valid Supabase identity whose email
+    has not been added to `users` is rejected (403).
     """
     claims = _decode_token(credentials.credentials)
-    user_id = claims.get("sub")
-    if not user_id:
-        raise _unauthorized("Token missing subject")
+    email = claims.get("email")
+    if not email:
+        raise _unauthorized("Token missing email")
 
-    user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    user = db.execute(
+        select(User).where(func.lower(User.email) == email.lower())
+    ).scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
