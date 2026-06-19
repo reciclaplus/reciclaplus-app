@@ -45,3 +45,13 @@ export interface Pdr {
   lng: number;
   created_at: string;
 }
+
+export interface WeekStatus {
+  year: number;
+  week: number;
+  status: "collected" | "empty" | "unavailable" | "closed";
+}
+
+export interface PdrWithHistory extends Pdr {
+  recent_collections: WeekStatus[];
+}

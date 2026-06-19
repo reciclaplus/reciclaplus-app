@@ -82,6 +82,16 @@ class PdrOut(BaseModel):
     created_at: datetime
 
 
+class WeekStatus(BaseModel):
+    year: int
+    week: int
+    status: CollectionStatus
+
+
+class PdrWithHistory(PdrOut):
+    recent_collections: list[WeekStatus] = []
+
+
 # --- Collections (weekly pass) ---
 
 class IsoWeek(BaseModel):
