@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, collections, pdrs, towns, users
+from app.routers import auth, collections, dashboard, pdrs, towns, users
 
 app = FastAPI(title="ReciclApp API")
 
@@ -26,6 +26,7 @@ app.include_router(towns.router)
 app.include_router(pdrs.router)
 app.include_router(collections.router)
 app.include_router(users.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health", tags=["health"])

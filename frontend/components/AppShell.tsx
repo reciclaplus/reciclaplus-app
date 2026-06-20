@@ -20,6 +20,7 @@ import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import MapIcon from "@mui/icons-material/Map";
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
+import DashboardIcon from "@mui/icons-material/Dashboard";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/home", label: strings.nav.home, minimum: "read", icon: <HomeIcon /> },
   { href: "/list", label: strings.nav.list, minimum: "read", icon: <ListAltIcon /> },
   { href: "/map", label: strings.nav.map, minimum: "read", icon: <MapIcon /> },
+  { href: "/dashboard", label: strings.nav.dashboard, minimum: "read", icon: <DashboardIcon /> },
   { href: "/new-pdr", label: strings.nav.newPdr, minimum: "write", icon: <AddLocationAltIcon /> },
   { href: "/collection-pass", label: strings.nav.collectionPass, minimum: "write", icon: <PlaylistAddCheckIcon /> },
   { href: "/admin", label: strings.nav.admin, minimum: "admin", icon: <AdminPanelSettingsIcon /> },
