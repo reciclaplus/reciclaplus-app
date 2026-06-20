@@ -23,7 +23,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { hasRole } from "@/lib/roles";
 import { strings } from "@/lib/strings";
-import type { PdrWithHistory, WeekStatus } from "@/lib/types";
+import type { PdrWithHistory, TownDetail, WeekStatus } from "@/lib/types";
 
 const STATUS_DOT_COLOR: Record<string, string> = {
   collected: "#2e7d32",
@@ -67,6 +67,13 @@ function PdrList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PdrWithHistory | null>(null);
+  const [towns, setTowns] = useState<TownDetail[]>([]);
+
+  const allCommunities = towns.flatMap((t) => t.communities.map((c) => c.name));
+  const allNeighborhoods = towns.flatMap((t) =>
+    t.communities.flatMap((c) => c.neighborhoods.map((n) => n.name)),
+  );
+  const allCategories = [...new Set(towns.flatMap((t) => t.categories))];
 
   const load = useCallback(() => {
     setLoading(true);
@@ -76,7 +83,15 @@ function PdrList() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    apiFetch<TownDetail[]>("/towns").then(async (summaries) => {
+      const details = await Promise.all(
+        summaries.map((t) => apiFetch<TownDetail>(`/towns/${t.id}`)),
+      );
+      setTowns(details);
+    });
+  }, [load]);
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -85,13 +100,53 @@ function PdrList() {
     load();
   }
 
+  async function processRowUpdate(
+    newRow: PdrWithHistory,
+    oldRow: PdrWithHistory,
+  ): Promise<PdrWithHistory> {
+    const changes: Record<string, string | null> = {};
+    for (const field of ["name", "description", "category", "community", "neighborhood"] as const) {
+      if (newRow[field] !== oldRow[field]) {
+        changes[field] = newRow[field];
+      }
+    }
+    if (Object.keys(changes).length === 0) return oldRow;
+
+    await apiFetch(`/pdrs/${newRow.id}`, {
+      method: "PUT",
+      body: JSON.stringify(changes),
+    });
+    return newRow;
+  }
+
   const columns: GridColDef<PdrWithHistory>[] = [
     { field: "internal_id", headerName: strings.list.colInternalId, width: 80 },
-    { field: "name", headerName: strings.list.colName, flex: 1, minWidth: 160 },
-    { field: "description", headerName: strings.list.colDescription, flex: 1, minWidth: 180 },
-    { field: "category", headerName: strings.list.colCategory, width: 130 },
-    { field: "community", headerName: strings.list.colCommunity, width: 150 },
-    { field: "neighborhood", headerName: strings.list.colNeighborhood, width: 160 },
+    { field: "name", headerName: strings.list.colName, flex: 1, minWidth: 160, editable: canWrite },
+    { field: "description", headerName: strings.list.colDescription, flex: 1, minWidth: 180, editable: canWrite },
+    {
+      field: "category",
+      headerName: strings.list.colCategory,
+      width: 130,
+      editable: canWrite,
+      type: "singleSelect",
+      valueOptions: allCategories,
+    },
+    {
+      field: "community",
+      headerName: strings.list.colCommunity,
+      width: 150,
+      editable: canWrite,
+      type: "singleSelect",
+      valueOptions: allCommunities,
+    },
+    {
+      field: "neighborhood",
+      headerName: strings.list.colNeighborhood,
+      width: 160,
+      editable: canWrite,
+      type: "singleSelect",
+      valueOptions: allNeighborhoods,
+    },
     {
       field: "recent_collections",
       headerName: strings.list.colHistory,
@@ -150,6 +205,7 @@ function PdrList() {
           loading={loading}
           getRowId={(row) => row.id}
           showToolbar
+          processRowUpdate={processRowUpdate}
           initialState={{
             columns: {
               columnVisibilityModel: { internal_id: false, created_at: false },

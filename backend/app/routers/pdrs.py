@@ -13,7 +13,7 @@ from app.isoweek import current_iso_week
 from app.models.collection import Collection
 from app.models.pdr import Pdr
 from app.models.user import User
-from app.schemas import PdrCreate, PdrOut, PdrWithHistory, WeekStatus
+from app.schemas import PdrCreate, PdrOut, PdrUpdate, PdrWithHistory, WeekStatus
 
 router = APIRouter(prefix="/pdrs", tags=["pdrs"])
 
@@ -104,6 +104,23 @@ def create_pdr(
     """Create a new pickup point."""
     pdr = Pdr(**payload.model_dump(), created_by=user.id)
     db.add(pdr)
+    db.commit()
+    db.refresh(pdr)
+    return pdr
+
+
+@router.put("/{pdr_id}", response_model=PdrOut)
+def update_pdr(
+    pdr_id: uuid.UUID,
+    payload: PdrUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role("write")),
+) -> Pdr:
+    pdr = db.get(Pdr, pdr_id)
+    if pdr is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(pdr, field, value)
     db.commit()
     db.refresh(pdr)
     return pdr

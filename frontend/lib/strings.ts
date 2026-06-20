@@ -31,7 +31,7 @@ export const strings = {
     list: "Listado",
     map: "Mapa",
     collectionPass: "Pasada semanal",
-    admin: "Administración",
+    admin: "Configuración",
     signOut: "Cerrar sesión",
     menu: "Menú",
   },
@@ -49,7 +49,7 @@ export const strings = {
     genericError: "Ocurrió un error. Inténtalo de nuevo.",
   },
   admin: {
-    title: "Administración",
+    title: "Configuración",
     tabUsers: "Usuarios",
     tabTowns: "Configuración de localidad",
     users: {
@@ -126,7 +126,8 @@ export const strings = {
     filterCommunity: "Comunidad",
     filterNeighborhood: "Barrio",
     all: "Todos",
-    selectNeighborhoodHint: "Selecciona un barrio para ver los puntos de recogida.",
+    selectNeighborhoodHint:
+      "Selecciona un barrio para ver los puntos de recogida.",
     today: "Semana actual",
     statuses: {
       collected: "Recogido",

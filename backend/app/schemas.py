@@ -67,6 +67,14 @@ class PdrCreate(BaseModel):
     lng: float
 
 
+class PdrUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    community: str | None = None
+    neighborhood: str | None = None
+    category: str | None = None
+
+
 class PdrOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
