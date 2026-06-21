@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.137.0",
+    "fastapi[standard]>=0.137.0",
     "firebase-admin>=7.4.0",
     "psycopg[binary]>=3.3.4",
     "pyjwt[crypto]>=2.13.0",
