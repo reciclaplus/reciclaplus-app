@@ -30,6 +30,6 @@ app.include_router(dashboard.router)
 
 
 @app.get("/health", tags=["health"])
-def health() -> dict[str, str]:
+def health() -> dict:
     """Liveness check."""
-    return {"status": "ok"}
+    return {"status": "ok", "cors_origins": settings.cors_origins}
