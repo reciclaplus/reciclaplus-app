@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -119,6 +119,7 @@ class CollectionPassRow(BaseModel):
     community: str
     neighborhood: str
     category: str
+    route_order: int | None = None
     status: CollectionStatus | None
 
 
@@ -127,6 +128,7 @@ class CollectionEntry(BaseModel):
 
     pdr_id: uuid.UUID
     status: CollectionStatus
+    collected_at: Optional[datetime] = None
 
 
 class CollectionPassSave(BaseModel):

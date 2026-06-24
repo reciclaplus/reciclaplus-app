@@ -33,7 +33,7 @@ function ClusteredMarkers({
   useEffect(() => {
     if (!map) return;
     const markers = pdrs.map((pdr) => {
-      const marker = new google.maps.Marker({
+      const marker = new google.maps.marker.AdvancedMarkerElement({
         position: { lat: pdr.lat, lng: pdr.lng },
         title: pdr.name,
       });
@@ -43,7 +43,7 @@ function ClusteredMarkers({
     const clusterer = new MarkerClusterer({ map, markers });
     return () => {
       clusterer.clearMarkers();
-      markers.forEach((m) => m.setMap(null));
+      markers.forEach((m) => (m.map = null));
     };
   }, [map, pdrs, onSelect]);
 
@@ -67,12 +67,13 @@ export function PdrMap({
 
   return (
     <Box sx={{ width: "100%", height, borderRadius: 1, overflow: "hidden" }}>
-      <APIProvider apiKey={API_KEY}>
+      <APIProvider apiKey={API_KEY} libraries={["marker"]}>
         <Map
           defaultCenter={center}
           defaultZoom={13}
           gestureHandling="greedy"
           disableDefaultUI={false}
+          mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"}
         >
           <ClusteredMarkers pdrs={pdrs} onSelect={setSelected} />
           {selected && (
