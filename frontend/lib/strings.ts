@@ -19,6 +19,11 @@ export const strings = {
     signOut: "Cerrar sesión",
     loading: "Cargando...",
     error: "No se pudo cargar tu información.",
+    quickLinks: "Accesos rápidos",
+    routePass: "Pasada en ruta",
+    routePassDesc: "Iniciar una pasada de recogida",
+    dashboard: "Dashboard",
+    dashboardDesc: "Ver estadísticas y métricas",
   },
   roles: {
     read: "Lectura",
