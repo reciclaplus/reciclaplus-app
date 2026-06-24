@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
@@ -11,12 +12,21 @@ import RecyclingIcon from "@mui/icons-material/Recycling";
 import { createClient } from "@/lib/supabase/client";
 import { strings } from "@/lib/strings";
 
-/**
- * Public landing page. Entry point for unauthenticated users with the
- * "Sign in with Google" button that kicks off the Supabase OAuth flow.
- */
 export default function LandingPage() {
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace("/home");
+      } else {
+        setChecking(false);
+      }
+    });
+  }, [router]);
 
   async function handleSignIn() {
     setLoading(true);
@@ -28,6 +38,8 @@ export default function LandingPage() {
       },
     });
   }
+
+  if (checking) return null;
 
   return (
     <Container maxWidth="sm">
