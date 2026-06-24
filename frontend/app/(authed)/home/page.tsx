@@ -49,22 +49,22 @@ function HomeContent() {
       <Typography variant="h6" sx={{ fontWeight: 600 }}>
         {strings.home.quickLinks}
       </Typography>
-      <Box sx={{ display: "flex", gap: 1.5 }}>
-        <Card sx={{ borderRadius: 2, border: "2px solid #4CAF50", bgcolor: "#f5f5f5", flex: "0 1 auto" }}>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+        <Card sx={{ borderRadius: 2, border: "2px solid #4CAF50", bgcolor: "#f5f5f5", minWidth: 0 }}>
           <CardActionArea component={Link} href="/collection-pass/route">
-            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2, px: 3.5 }}>
-              <RouteIcon sx={{ fontSize: 32, color: "#4CAF50" }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2, px: 3 }}>
+              <RouteIcon sx={{ fontSize: 32, color: "#4CAF50", flexShrink: 0 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 {strings.home.routePass}
               </Typography>
             </CardContent>
           </CardActionArea>
         </Card>
-        <Card sx={{ borderRadius: 2, border: "2px solid #1976D2", bgcolor: "#f5f5f5", flex: "0 1 auto" }}>
+        <Card sx={{ borderRadius: 2, border: "2px solid #1976D2", bgcolor: "#f5f5f5", minWidth: 0 }}>
           <CardActionArea component={Link} href="/dashboard">
-            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2, px: 3.5 }}>
-              <BarChartIcon sx={{ fontSize: 32, color: "#1976D2" }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2, px: 3 }}>
+              <BarChartIcon sx={{ fontSize: 32, color: "#1976D2", flexShrink: 0 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 {strings.home.dashboard}
               </Typography>
             </CardContent>
