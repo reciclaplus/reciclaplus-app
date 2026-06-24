@@ -183,3 +183,25 @@ class NameWrite(BaseModel):
     """Create/rename a community or neighborhood."""
 
     name: str = Field(min_length=1)
+
+
+# --- Weight entries ---
+
+PlasticType = Literal["pet", "hdpe", "pp", "trash"]
+
+
+class WeightEntryCreate(BaseModel):
+    date: str = Field(description="ISO date string (YYYY-MM-DD)")
+    plastic_type: PlasticType
+    weight_lbs: float = Field(gt=0)
+
+
+class WeightEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    date: datetime
+    plastic_type: PlasticType
+    weight_lbs: float
+    created_by: uuid.UUID | None
+    created_at: datetime

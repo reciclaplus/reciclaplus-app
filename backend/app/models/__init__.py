@@ -3,6 +3,7 @@ from app.models.user import User
 from app.models.town import Town, Community, Neighborhood
 from app.models.pdr import Pdr
 from app.models.collection import Collection
+from app.models.weight_entry import WeightEntry
 
 __all__ = [
     "Base",
@@ -12,4 +13,5 @@ __all__ = [
     "Neighborhood",
     "Pdr",
     "Collection",
+    "WeightEntry",
 ]
