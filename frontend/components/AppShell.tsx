@@ -25,6 +25,7 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
 import RecyclingIcon from "@mui/icons-material/Recycling";
+import ScaleIcon from "@mui/icons-material/Scale";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { hasRole, type Role } from "@/lib/roles";
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: strings.nav.dashboard, minimum: "read", icon: <DashboardIcon /> },
   { href: "/new-pdr", label: strings.nav.newPdr, minimum: "write", icon: <AddLocationAltIcon /> },
   { href: "/collection-pass", label: strings.nav.collectionPass, minimum: "write", icon: <PlaylistAddCheckIcon /> },
+  { href: "/weights", label: strings.nav.weights, minimum: "write", icon: <ScaleIcon /> },
   { href: "/admin", label: strings.nav.admin, minimum: "admin", icon: <AdminPanelSettingsIcon /> },
 ];
 
