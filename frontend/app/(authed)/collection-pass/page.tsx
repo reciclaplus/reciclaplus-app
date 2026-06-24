@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -15,19 +16,12 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import RouteIcon from "@mui/icons-material/Route";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
 import { strings } from "@/lib/strings";
-
-type Status = "collected" | "empty" | "unavailable" | "closed";
-const STATUSES: Status[] = ["collected", "empty", "unavailable", "closed"];
-
-const STATUS_COLORS: Record<Status, string> = {
-  collected: "#2e7d32",
-  empty: "#ed6c02",
-  unavailable: "#d32f2f",
-  closed: "#616161",
-};
+import { type Status, STATUSES, STATUS_COLORS } from "@/lib/collection-status";
+import { type IsoWeek, shiftWeek, formatWeekLabel } from "@/lib/week";
 
 interface PassRow {
   pdr_id: string;
@@ -37,11 +31,6 @@ interface PassRow {
   neighborhood: string;
   category: string;
   status: Status | null;
-}
-
-interface IsoWeek {
-  year: number;
-  week: number;
 }
 
 function StatusPicker({
@@ -84,28 +73,6 @@ function StatusPicker({
       })}
     </Box>
   );
-}
-
-function mondayOfWeek(w: IsoWeek): Date {
-  const d = new Date(Date.UTC(w.year, 0, 4 + (w.week - 1) * 7));
-  const dow = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - dow + 1);
-  return d;
-}
-
-function shiftWeek(w: IsoWeek, delta: number): IsoWeek {
-  const mon = mondayOfWeek(w);
-  mon.setUTCDate(mon.getUTCDate() + delta * 7);
-  const thu = new Date(mon);
-  thu.setUTCDate(thu.getUTCDate() + 3);
-  const yearStart = new Date(Date.UTC(thu.getUTCFullYear(), 0, 1));
-  const isoWeek = Math.ceil(((thu.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return { year: thu.getUTCFullYear(), week: isoWeek };
-}
-
-function formatWeekLabel(w: IsoWeek): string {
-  const mon = mondayOfWeek(w);
-  return `Semana del ${mon.toLocaleDateString("es-DO", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}`;
 }
 
 function CollectionPass() {
@@ -226,6 +193,16 @@ function CollectionPass() {
           </Button>
         )}
       </Box>
+
+      <Button
+        component={Link}
+        href="/collection-pass/route"
+        variant="contained"
+        startIcon={<RouteIcon />}
+        sx={{ alignSelf: "flex-start" }}
+      >
+        {strings.collectionRoute.start}
+      </Button>
 
       {rows.length > 0 && (
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>

@@ -107,19 +107,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100dvh" }}>
-      {/* Top bar — only needed for the menu button + title on mobile. */}
       <AppBar
         position="fixed"
-        sx={{
-          display: { sm: "none" },
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-        }}
+        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
       >
         <Toolbar>
           <IconButton
             color="inherit"
             edge="start"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => setMobileOpen((o) => !o)}
             aria-label={strings.nav.menu}
             sx={{ mr: 1 }}
           >
@@ -132,39 +128,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Toolbar>
       </AppBar>
 
-      {/* Navigation drawers. */}
-      <Box
-        component="nav"
-        sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{ "& .MuiDrawer-paper": { width: DRAWER_WIDTH } }}
       >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={() => setMobileOpen(false)}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: "block", sm: "none" },
-            "& .MuiDrawer-paper": { width: DRAWER_WIDTH },
-          }}
-        >
-          {drawerContent}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          open
-          sx={{
-            display: { xs: "none", sm: "block" },
-            "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
-          }}
-        >
-          {drawerContent}
-        </Drawer>
-      </Box>
+        {drawerContent}
+      </Drawer>
 
-      {/* Main content. */}
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` } }}>
-        {/* Spacer to clear the fixed mobile AppBar. */}
-        <Toolbar sx={{ display: { sm: "none" } }} />
+      <Box component="main" sx={{ flexGrow: 1, p: 3, width: "100%" }}>
+        <Toolbar />
         {children}
       </Box>
     </Box>

@@ -7,7 +7,7 @@ the town-config tables drive the form dropdowns.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Identity, String, func
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Identity, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,6 +31,9 @@ class Pdr(Base):
     category: Mapped[str] = mapped_column(String, nullable=False)
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lng: Mapped[float] = mapped_column(Float, nullable=False)
+    route_order: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

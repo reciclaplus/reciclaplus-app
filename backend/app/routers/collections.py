@@ -4,7 +4,7 @@ Collections are addressed by ISO week. The pass page reads every PDR with its
 status for a week and writes the recorded statuses back.
 """
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import and_, select
@@ -46,6 +46,7 @@ def get_week(
             Pdr.community,
             Pdr.neighborhood,
             Pdr.category,
+            Pdr.route_order,
             Collection.status,
         )
         .select_from(Pdr)
@@ -68,6 +69,7 @@ def get_week(
             community=r.community,
             neighborhood=r.neighborhood,
             category=r.category,
+            route_order=r.route_order,
             status=r.status,
         )
         for r in rows
@@ -85,7 +87,9 @@ def save_week(
     """Upsert the statuses recorded for the given ISO week, then return the
     refreshed week view."""
     today = date.today()
+    now = datetime.now(timezone.utc)
     for entry in payload.entries:
+        created_at = entry.collected_at or now
         stmt = (
             pg_insert(Collection)
             .values(
@@ -95,10 +99,16 @@ def save_week(
                 status=entry.status,
                 date=today,
                 created_by=user.id,
+                created_at=created_at,
             )
             .on_conflict_do_update(
                 index_elements=["pdr_id", "year", "week"],
-                set_={"status": entry.status, "date": today, "created_by": user.id},
+                set_={
+                    "status": entry.status,
+                    "date": today,
+                    "created_by": user.id,
+                    "created_at": created_at,
+                },
             )
         )
         db.execute(stmt)
