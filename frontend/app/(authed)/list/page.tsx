@@ -3,11 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Alert from "@mui/material/Alert";
-import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardActionArea from "@mui/material/CardActionArea";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Dialog from "@mui/material/Dialog";
@@ -15,15 +12,15 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
-import InputAdornment from "@mui/material/InputAdornment";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import AddIcon from "@mui/icons-material/Add";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DeleteIcon from "@mui/icons-material/Delete";
-import SearchIcon from "@mui/icons-material/Search";
+import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid";
+import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -32,9 +29,17 @@ import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import { STATUS_PILL_COLORS } from "@/lib/collection-status";
 import { buildBarrioColorMap, getBarrioColor } from "@/lib/barrio-colors";
-import type { PdrWithHistory, TownDetail } from "@/lib/types";
+import { mondayOfWeek } from "@/lib/week";
+import type { PdrWithHistory, TownDetail, WeekStatus } from "@/lib/types";
 
-const PAGE_SIZE = 6;
+const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
+
+function formatMondayDate(w: WeekStatus): string {
+  const mon = mondayOfWeek(w);
+  const dd = String(mon.getUTCDate()).padStart(2, "0");
+  const mm = String(mon.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${mon.getUTCFullYear()}`;
+}
 
 function StatusPill({ status }: { status: keyof typeof strings.collectionPass.statuses }) {
   const colors = STATUS_PILL_COLORS[status];
@@ -52,93 +57,28 @@ function StatusPill({ status }: { status: keyof typeof strings.collectionPass.st
   );
 }
 
-function PdrRow({
-  pdr,
-  barrioColor,
-  onOpen,
-}: {
-  pdr: PdrWithHistory;
-  barrioColor: string;
-  onOpen: () => void;
-}) {
-  const lastWeek = pdr.recent_collections[pdr.recent_collections.length - 1];
-  const initials = pdr.name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
+function HistoryStrip({ history }: { history: WeekStatus[] }) {
+  const slots = Array.from({ length: 5 }, (_, i) => history[history.length - 5 + i]);
   return (
-    <Card sx={{ borderRadius: "14px", boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
-      <CardActionArea onClick={onOpen} sx={{ p: 1.75 }}>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr auto", md: "1fr 130px 150px 110px 24px" },
-            alignItems: "center",
-            gap: 1.5,
-          }}
-        >
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
-            <Avatar
-              sx={{
-                width: 38,
-                height: 38,
-                bgcolor: COLORS.limeSoft,
-                color: COLORS.emeraldEnd,
-                fontWeight: 800,
-                fontSize: 13,
-                flexShrink: 0,
-              }}
-            >
-              {initials}
-            </Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography noWrap sx={{ fontSize: 15.5, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
-                {pdr.name}
-              </Typography>
-              <Typography noWrap sx={{ fontSize: 12, fontWeight: 500, color: COLORS.muted }}>
-                {pdr.description || pdr.category}
-              </Typography>
-            </Box>
-          </Stack>
-
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: "center", display: { xs: "none", md: "flex" } }}
-          >
-            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: barrioColor, flexShrink: 0 }} />
-            <Typography noWrap sx={{ fontSize: 13.5, fontWeight: 600, color: COLORS.body }}>
-              {pdr.neighborhood}
-            </Typography>
-          </Stack>
-
-          <Typography
-            sx={{
-              display: { xs: "none", md: "block" },
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: COLORS.body,
-            }}
-          >
-            {lastWeek
-              ? `S${lastWeek.week}/${lastWeek.year}`
-              : strings.list.noHistory}
-          </Typography>
-
-          <Box sx={{ display: { xs: "none", md: "block" } }}>
-            {lastWeek ? <StatusPill status={lastWeek.status} /> : null}
-          </Box>
-
-          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-            <ChevronRightIcon sx={{ color: "#c2ccc3" }} />
-          </Box>
-        </Box>
-      </CardActionArea>
-    </Card>
+    <Stack direction="row" spacing={0.75}>
+      {slots.map((ws, i) =>
+        ws ? (
+          <Tooltip key={i} title={`S${ws.week}/${ws.year} · ${strings.collectionPass.statuses[ws.status]}`}>
+            <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: COLORS.status[ws.status].dot }} />
+          </Tooltip>
+        ) : (
+          <Box key={i} sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: COLORS.hairlineAlt }} />
+        ),
+      )}
+    </Stack>
   );
+}
+
+interface PdrRow extends PdrWithHistory {
+  barrioColor: string;
+  lastWeekLabel: string;
+  lastWeekSort: number;
+  lastStatus: WeekStatus["status"] | "";
 }
 
 function PdrList() {
@@ -149,9 +89,8 @@ function PdrList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [towns, setTowns] = useState<TownDetail[]>([]);
-  const [search, setSearch] = useState("");
   const [activeBarrio, setActiveBarrio] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<PdrWithHistory | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<PdrWithHistory>>({});
   const [saving, setSaving] = useState(false);
@@ -183,29 +122,34 @@ function PdrList() {
   const communityCount = useMemo(() => new Set(pdrs.map((p) => p.community)).size, [pdrs]);
 
   const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
     return pdrs.filter((p) => {
-      const matchesSearch =
-        !term ||
-        p.name.toLowerCase().includes(term) ||
-        (p.description ?? "").toLowerCase().includes(term);
       const matchesBarrio = !activeBarrio || p.neighborhood === activeBarrio;
-      return matchesSearch && matchesBarrio;
+      const matchesCategory = !activeCategory || p.category === activeCategory;
+      return matchesBarrio && matchesCategory;
     });
-  }, [pdrs, search, activeBarrio]);
+  }, [pdrs, activeBarrio, activeCategory]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
-  const pageRows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-
-  function updateSearch(value: string) {
-    setSearch(value);
-    setPage(0);
-  }
+  const rows: PdrRow[] = useMemo(
+    () =>
+      filtered.map((p) => {
+        const lastWeek = p.recent_collections[p.recent_collections.length - 1];
+        return {
+          ...p,
+          barrioColor: getBarrioColor(barrioColorMap, p.neighborhood),
+          lastWeekLabel: lastWeek ? formatMondayDate(lastWeek) : strings.list.noHistory,
+          lastWeekSort: lastWeek ? lastWeek.year * 100 + lastWeek.week : -1,
+          lastStatus: lastWeek?.status ?? "",
+        };
+      }),
+    [filtered, barrioColorMap],
+  );
 
   function updateBarrio(value: string | null) {
     setActiveBarrio(value);
-    setPage(0);
+  }
+
+  function updateCategory(value: string | null) {
+    setActiveCategory(value);
   }
 
   function openEdit(pdr: PdrWithHistory) {
@@ -251,6 +195,110 @@ function PdrList() {
     [towns],
   );
 
+  const columns: GridColDef<PdrRow>[] = useMemo(
+    () => [
+      {
+        field: "name",
+        headerName: strings.list.colName,
+        flex: 1.6,
+        minWidth: 220,
+        valueGetter: (_value, row) => `${row.name} ${row.description ?? ""}`.trim(),
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Box sx={{ display: "flex", alignItems: "center", height: "100%", minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
+              {params.row.name}
+            </Typography>
+            {params.row.description && (
+              <Typography noWrap sx={{ fontSize: 12, fontWeight: 500, color: COLORS.muted, ml: 1 }}>
+                {params.row.description}
+              </Typography>
+            )}
+          </Box>
+        ),
+      },
+      {
+        field: "category",
+        headerName: strings.list.colCategory,
+        width: 140,
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Chip
+            label={params.row.category}
+            size="small"
+            variant="outlined"
+            sx={{ fontWeight: 700, borderColor: COLORS.hairlineSoft, color: COLORS.body }}
+          />
+        ),
+      },
+      {
+        field: "community",
+        headerName: strings.list.colCommunity,
+        width: 150,
+      },
+      {
+        field: "neighborhood",
+        headerName: strings.list.colNeighborhood,
+        width: 160,
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", height: "100%" }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: params.row.barrioColor, flexShrink: 0 }} />
+            <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, color: COLORS.body }}>
+              {params.row.neighborhood}
+            </Typography>
+          </Stack>
+        ),
+      },
+      {
+        field: "lastWeekSort",
+        headerName: strings.list.colLastCollection,
+        width: 130,
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLORS.body }}>
+              {params.row.lastWeekLabel}
+            </Typography>
+          </Box>
+        ),
+      },
+      {
+        field: "lastStatus",
+        headerName: strings.list.colStatus,
+        width: 130,
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+            {params.row.lastStatus ? <StatusPill status={params.row.lastStatus} /> : null}
+          </Box>
+        ),
+      },
+      {
+        field: "history",
+        headerName: strings.list.colHistory,
+        width: 150,
+        sortable: false,
+        filterable: false,
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <HistoryStrip history={params.row.recent_collections} />
+          </Box>
+        ),
+      },
+      {
+        field: "created_at",
+        headerName: strings.list.colCreatedAt,
+        width: 140,
+        type: "date",
+        valueGetter: (_value, row) => new Date(row.created_at),
+        renderCell: (params: GridRenderCellParams<PdrRow>) => (
+          <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLORS.body }}>
+              {new Date(params.row.created_at).toLocaleDateString("es-ES")}
+            </Typography>
+          </Box>
+        ),
+      },
+    ],
+    [],
+  );
+
   if (error) {
     return <Alert severity="error">{strings.list.loadError}</Alert>;
   }
@@ -283,120 +331,97 @@ function PdrList() {
         )}
       </Stack>
 
-      <TextField
-        fullWidth
-        placeholder={strings.list.searchPlaceholder}
-        value={search}
-        onChange={(e) => updateSearch(e.target.value)}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ color: COLORS.muted }} />
-              </InputAdornment>
-            ),
-          },
-        }}
-        sx={{
-          "& .MuiOutlinedInput-root": {
-            bgcolor: "#fff",
-            borderRadius: "12px",
-            height: 44,
-            "& fieldset": { borderColor: COLORS.hairlineSoft },
-          },
-        }}
-      />
-
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-        <Chip
-          label={strings.list.allBarrios}
-          onClick={() => updateBarrio(null)}
-          sx={{
-            fontWeight: 700,
-            bgcolor: activeBarrio === null ? COLORS.emeraldEnd : "#fff",
-            color: activeBarrio === null ? "#fff" : COLORS.body,
-            border: `1px solid ${activeBarrio === null ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
-          }}
-        />
-        {allNeighborhoods.map((n) => (
+      <Stack spacing={0.75}>
+        <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
+          {strings.list.colNeighborhood}
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
           <Chip
-            key={n}
-            label={n}
-            onClick={() => updateBarrio(n)}
+            label={strings.list.allBarrios}
+            onClick={() => updateBarrio(null)}
             sx={{
               fontWeight: 700,
-              bgcolor: activeBarrio === n ? COLORS.emeraldEnd : "#fff",
-              color: activeBarrio === n ? "#fff" : COLORS.body,
-              border: `1px solid ${activeBarrio === n ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
+              bgcolor: activeBarrio === null ? COLORS.emeraldEnd : "#fff",
+              color: activeBarrio === null ? "#fff" : COLORS.body,
+              border: `1px solid ${activeBarrio === null ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
             }}
           />
-        ))}
-      </Box>
+          {allNeighborhoods.map((n) => (
+            <Chip
+              key={n}
+              label={n}
+              onClick={() => updateBarrio(n)}
+              sx={{
+                fontWeight: 700,
+                bgcolor: activeBarrio === n ? COLORS.emeraldEnd : "#fff",
+                color: activeBarrio === n ? "#fff" : COLORS.body,
+                border: `1px solid ${activeBarrio === n ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
+              }}
+            />
+          ))}
+        </Box>
+      </Stack>
 
-      {/* Table header (desktop only) */}
-      <Box
-        sx={{
-          display: { xs: "none", md: "grid" },
-          gridTemplateColumns: "1fr 130px 150px 110px 24px",
-          gap: 1.5,
-          px: 1.75,
-        }}
-      >
-        {[strings.list.colName, strings.list.colNeighborhood, strings.list.colLastCollection, strings.list.colStatus, ""].map(
-          (label, i) => (
-            <Typography
-              key={i}
-              sx={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}
-            >
-              {label}
-            </Typography>
-          ),
-        )}
-      </Box>
+      <Stack spacing={0.75}>
+        <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
+          {strings.list.colCategory}
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+          <Chip
+            label={strings.list.allCategories}
+            onClick={() => updateCategory(null)}
+            sx={{
+              fontWeight: 700,
+              bgcolor: activeCategory === null ? COLORS.emeraldEnd : "#fff",
+              color: activeCategory === null ? "#fff" : COLORS.body,
+              border: `1px solid ${activeCategory === null ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
+            }}
+          />
+          {allCategories.map((c) => (
+            <Chip
+              key={c}
+              label={c}
+              onClick={() => updateCategory(c)}
+              sx={{
+                fontWeight: 700,
+                bgcolor: activeCategory === c ? COLORS.emeraldEnd : "#fff",
+                color: activeCategory === c ? "#fff" : COLORS.body,
+                border: `1px solid ${activeCategory === c ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
+              }}
+            />
+          ))}
+        </Box>
+      </Stack>
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
           <CircularProgress />
         </Box>
-      ) : pageRows.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Alert severity="info">{pdrs.length === 0 ? strings.list.empty : strings.list.emptyFiltered}</Alert>
       ) : (
-        <Stack spacing={1.25}>
-          {pageRows.map((pdr) => (
-            <PdrRow
-              key={pdr.id}
-              pdr={pdr}
-              barrioColor={getBarrioColor(barrioColorMap, pdr.neighborhood)}
-              onOpen={() => (canWrite ? openEdit(pdr) : undefined)}
-            />
-          ))}
-        </Stack>
-      )}
-
-      {!loading && filtered.length > 0 && (
-        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", pt: 1 }}>
-          <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: COLORS.body }}>
-            {strings.list.showing} {pageRows.length} {strings.list.of} {filtered.length}
-          </Typography>
-          <Stack direction="row" spacing={0.5}>
-            {Array.from({ length: pageCount }).map((_, i) => (
-              <Button
-                key={i}
-                size="small"
-                onClick={() => setPage(i)}
-                sx={{
-                  minWidth: 32,
-                  borderRadius: "10px",
-                  bgcolor: safePage === i ? COLORS.emeraldEnd : "transparent",
-                  color: safePage === i ? "#fff" : COLORS.body,
-                  "&:hover": { bgcolor: safePage === i ? COLORS.emeraldDeepest : COLORS.hairlineAlt },
-                }}
-              >
-                {i + 1}
-              </Button>
-            ))}
-          </Stack>
-        </Stack>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          localeText={gridLocaleText}
+          showToolbar
+          autoHeight
+          disableRowSelectionOnClick
+          onRowClick={(params) => (canWrite ? openEdit(params.row as PdrWithHistory) : undefined)}
+          pageSizeOptions={[10, 25, 50]}
+          initialState={{
+            pagination: { paginationModel: { pageSize: 10 } },
+            columns: { columnVisibilityModel: { created_at: false } },
+          }}
+          sx={{
+            bgcolor: "#fff",
+            borderRadius: "14px",
+            borderColor: COLORS.hairlineSoft,
+            "--DataGrid-containerBackground": COLORS.canvas,
+            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800, fontSize: 12, color: COLORS.body },
+            "& .MuiDataGrid-row": { cursor: canWrite ? "pointer" : "default" },
+          }}
+        />
       )}
 
       <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} fullWidth maxWidth="xs">

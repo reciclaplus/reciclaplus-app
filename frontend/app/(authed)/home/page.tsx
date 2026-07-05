@@ -217,7 +217,7 @@ function HomeContent() {
               boxShadow: "0 8px 22px -10px rgba(13,51,32,.18)",
             }}
           >
-            <CardActionArea component={Link} href="/collection-pass" sx={{ height: "100%", p: { xs: 2.5, sm: 3 } }}>
+            <CardActionArea component={Link} href="/collection-pass/route" sx={{ height: "100%", p: { xs: 2.5, sm: 3 } }}>
               <Stack direction="row" spacing={2.5} sx={{ alignItems: "center" }}>
                 <Box
                   sx={{
