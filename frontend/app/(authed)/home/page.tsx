@@ -197,7 +197,7 @@ function HomeContent() {
             label={`${strings.home.role}: ${strings.roles[user.role]}`}
             sx={{
               bgcolor: COLORS.roleBadgeBg,
-              color: COLORS.emeraldEnd,
+              color: "#9a5f10",
               fontWeight: 800,
               fontSize: 12.5,
               height: 32,

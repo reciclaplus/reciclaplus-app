@@ -20,23 +20,23 @@ declare module "@mui/material/styles" {
 }
 
 /**
- * Design tokens for the "emerald" redesign. Fonts are wired in via
- * next/font/google in app/layout.tsx and exposed here as CSS variables.
+ * Design tokens — "Bosque + Ámbar" (10a): deep forest green + warm amber accent.
+ * Fonts are wired in via next/font/google in app/layout.tsx as CSS variables.
  */
 export const COLORS = {
-  emeraldStart: "#0e7a47",
-  emeraldEnd: "#0a6238",
-  emeraldDeepest: "#0a4d2c",
-  ink: "#0d3320",
-  body: "#5a6b5c",
+  emeraldStart: "#12633f",
+  emeraldEnd: "#0d4e31",
+  emeraldDeepest: "#3a2405",  // dark contrast on amber accent
+  ink: "#16301f",
+  body: "#566052",
   muted: "#9aa69b",
   mutedAlt: "#7a867b",
-  lime: "#bef264",
-  limeSoft: "#e8f4d8",
-  roleBadgeBg: "#d3ecbf",
-  canvas: "#f4f8f0",
+  lime: "#f5951f",            // amber accent (replaces lime in 7b/8)
+  limeSoft: "#e9efdd",
+  roleBadgeBg: "#f6e3c4",
+  canvas: "#f4f6ec",
   surface: "#ffffff",
-  hairline: "#e6ece1",
+  hairline: "#e6ebd9",
   hairlineAlt: "#edf1e8",
   hairlineSoft: "#e0e7da",
   status: {

@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             flexShrink: 0,
           }}
         >
-          <RecyclingIcon sx={{ color: COLORS.emeraldDeepest, fontSize: 20 }} />
+          <RecyclingIcon sx={{ color: COLORS.emeraldEnd, fontSize: 20 }} />
         </Box>
         <Typography sx={{ fontSize: 16, fontWeight: 800, fontFamily: "var(--font-display)" }}>
           {strings.appName}

@@ -59,7 +59,7 @@ const STATUS_COLORS: Record<string, string> = {
   closed: COLORS.status.closed.dot,
 };
 
-const COMMUNITY_GREENS = ["#0a6238", "#157a47", "#3a9265", "#67ab86", "#8fc4a8", "#bcdcc6"];
+const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
 
 function weekLabel(_year: number, week: number): string {
   return `S${week}`;
