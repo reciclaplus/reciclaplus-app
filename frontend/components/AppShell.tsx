@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
+import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -14,6 +16,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import MapIcon from "@mui/icons-material/Map";
+import MenuIcon from "@mui/icons-material/Menu";
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
@@ -98,6 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const items = NAV_ITEMS.filter((item) => hasRole(user?.role, item.minimum));
   const secondaryItems = NAV_ITEMS_SECONDARY.filter((item) => hasRole(user?.role, item.minimum));
@@ -110,21 +114,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const initial = (user?.name ?? user?.email ?? "?").charAt(0).toUpperCase();
 
-  const sidebar = (
-    <Box
-      sx={{
-        width: SIDEBAR_WIDTH,
-        flexShrink: 0,
-        height: "100dvh",
-        position: "sticky",
-        top: 0,
-        display: "flex",
-        flexDirection: "column",
-        background: `linear-gradient(175deg, ${COLORS.emeraldStart}, ${COLORS.emeraldEnd})`,
-        color: "#fff",
-        p: 2,
-      }}
-    >
+  const sidebarContent = (onNavigate?: () => void) => (
+    <>
       <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", px: 1, py: 1.5 }}>
         <Box
           sx={{
@@ -147,13 +138,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <Stack spacing={0.5} sx={{ mt: 1, flexGrow: 1, overflowY: "auto" }}>
         {items.map((item) => (
-          <NavLink key={item.href} item={item} active={pathname === item.href} />
+          <NavLink key={item.href} item={item} active={pathname === item.href} onClick={onNavigate} />
         ))}
         {secondaryItems.length > 0 && (
           <>
             <Divider sx={{ borderColor: "rgba(255,255,255,.18)", my: 1 }} />
             {secondaryItems.map((item) => (
-              <NavLink key={item.href} item={item} active={pathname === item.href} />
+              <NavLink key={item.href} item={item} active={pathname === item.href} onClick={onNavigate} />
             ))}
           </>
         )}
@@ -186,12 +177,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </IconButton>
         </Box>
       )}
-    </Box>
+    </>
   );
 
   return (
     <Box sx={{ display: "flex", minHeight: "100dvh", bgcolor: "background.default" }}>
-      {isDesktop && sidebar}
+      {isDesktop && (
+        <Box
+          sx={{
+            width: SIDEBAR_WIDTH,
+            flexShrink: 0,
+            height: "100dvh",
+            position: "sticky",
+            top: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: `linear-gradient(175deg, ${COLORS.emeraldStart}, ${COLORS.emeraldEnd})`,
+            color: "#fff",
+            p: 2,
+          }}
+        >
+          {sidebarContent()}
+        </Box>
+      )}
 
       <Box
         component="main"
@@ -250,7 +258,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Box>
             );
           })}
+          <Box
+            component="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label={strings.nav.menu}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0.25,
+              minWidth: 56,
+              minHeight: 44,
+              justifyContent: "center",
+              border: "none",
+              bgcolor: "transparent",
+              cursor: "pointer",
+              color: "rgba(255,255,255,.75)",
+              px: 1,
+            }}
+          >
+            <MenuIcon />
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: "inherit" }}>
+              {strings.nav.menu}
+            </Typography>
+          </Box>
         </Box>
+      )}
+
+      {!isDesktop && (
+        <Drawer
+          anchor="left"
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          slotProps={{
+            paper: {
+              sx: {
+                width: SIDEBAR_WIDTH,
+                display: "flex",
+                flexDirection: "column",
+                background: `linear-gradient(175deg, ${COLORS.emeraldStart}, ${COLORS.emeraldEnd})`,
+                color: "#fff",
+                p: 2,
+              },
+            },
+          }}
+        >
+          {sidebarContent(() => setMenuOpen(false))}
+        </Drawer>
       )}
     </Box>
   );
