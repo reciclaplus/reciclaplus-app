@@ -1,6 +1,10 @@
 """Dashboard statistics endpoint."""
 
-from fastapi import APIRouter, Depends
+import calendar
+from datetime import date
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -12,6 +16,24 @@ from app.models.pdr import Pdr
 from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+WeekRange = Literal["3m", "6m", "1y", "all"]
+
+_RANGE_MONTHS: dict[str, int] = {"3m": 3, "6m": 6, "1y": 12}
+
+
+def _months_ago(d: date, months: int) -> date:
+    """Subtract `months` from `d`, clamping the day to the target month's length."""
+    total = d.month - 1 - months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _range_cutoff(week_range: WeekRange) -> date | None:
+    months = _RANGE_MONTHS.get(week_range)
+    return _months_ago(date.today(), months) if months else None
 
 
 class NeighborhoodCount(BaseModel):
@@ -55,6 +77,9 @@ class DashboardStats(BaseModel):
 
 @router.get("/stats", response_model=DashboardStats)
 def get_stats(
+    week_range: WeekRange = Query("all", alias="range"),
+    neighborhood: str | None = Query(None),
+    category: str | None = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(require_role("read")),
 ) -> DashboardStats:
@@ -78,19 +103,28 @@ def get_stats(
         .order_by(func.count().desc())
     ).all()
 
-    week_rows = db.execute(
-        select(
-            Collection.year,
-            Collection.week,
-            func.count().filter(Collection.status == "collected").label("collected"),
-            func.count().filter(Collection.status == "empty").label("empty"),
-            func.count().filter(Collection.status == "unavailable").label("unavailable"),
-            func.count().filter(Collection.status == "closed").label("closed"),
-            func.count().label("total"),
-        )
-        .group_by(Collection.year, Collection.week)
-        .order_by(Collection.year, Collection.week)
-    ).all()
+    week_query = select(
+        Collection.year,
+        Collection.week,
+        func.count().filter(Collection.status == "collected").label("collected"),
+        func.count().filter(Collection.status == "empty").label("empty"),
+        func.count().filter(Collection.status == "unavailable").label("unavailable"),
+        func.count().filter(Collection.status == "closed").label("closed"),
+        func.count().label("total"),
+    )
+    if neighborhood or category:
+        week_query = week_query.join(Pdr, Pdr.id == Collection.pdr_id)
+        if neighborhood:
+            week_query = week_query.where(Pdr.neighborhood == neighborhood)
+        if category:
+            week_query = week_query.where(Pdr.category == category)
+    cutoff = _range_cutoff(week_range)
+    if cutoff:
+        week_query = week_query.where(Collection.date >= cutoff)
+    week_query = week_query.group_by(Collection.year, Collection.week).order_by(
+        Collection.year, Collection.week
+    )
+    week_rows = db.execute(week_query).all()
 
     latest = db.execute(
         select(Collection.year, Collection.week)

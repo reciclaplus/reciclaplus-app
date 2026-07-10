@@ -7,7 +7,11 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import FormControl from "@mui/material/FormControl";
 import Grid from "@mui/material/Grid";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import Select, { type SelectChangeEvent } from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
@@ -61,8 +65,19 @@ const STATUS_COLORS: Record<string, string> = {
 
 const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
 
+type WeekRange = "all" | "3m" | "6m" | "1y";
+
 function weekLabel(year: number, week: number): string {
   return `S${week}'${String(year).slice(-2)}`;
+}
+
+function buildChartQuery(range: WeekRange, neighborhood: string, category: string): string {
+  const params = new URLSearchParams();
+  if (range !== "all") params.set("range", range);
+  if (neighborhood) params.set("neighborhood", neighborhood);
+  if (category) params.set("category", category);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
 }
 
 function KpiTile({
@@ -123,12 +138,26 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  const [chartWeeks, setChartWeeks] = useState<WeekCollections[] | null>(null);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [rangeFilter, setRangeFilter] = useState<WeekRange>("1y");
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+
   useEffect(() => {
     apiFetch<DashboardStats>("/dashboard/stats")
       .then(setStats)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    setChartLoading(true);
+    apiFetch<DashboardStats>(`/dashboard/stats${buildChartQuery(rangeFilter, neighborhoodFilter, categoryFilter)}`)
+      .then((data) => setChartWeeks(data.collections_by_week))
+      .catch(() => setError(true))
+      .finally(() => setChartLoading(false));
+  }, [rangeFilter, neighborhoodFilter, categoryFilter]);
 
   if (error) return <Alert severity="error">{strings.dashboard.loadError}</Alert>;
   if (loading || !stats) {
@@ -178,37 +207,91 @@ function Dashboard() {
       </Grid>
 
       {/* Weekly bar chart */}
-      {stats.collections_by_week.length > 0 && (
-        <Card>
-          <CardContent>
-            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-              <Typography sx={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
-                {strings.dashboard.collectionsOverTime}
-              </Typography>
-              <Chip
-                icon={<TrendingUpIcon sx={{ fontSize: 16, color: `${COLORS.status.collected.text} !important` }} />}
-                label="+12% vs. mes pasado"
-                size="small"
-                sx={{ bgcolor: COLORS.status.collected.bg, color: COLORS.status.collected.text, fontWeight: 700 }}
-              />
-            </Stack>
+      <Card>
+        <CardContent>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1, flexWrap: "wrap", gap: 1 }}>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
+              {strings.dashboard.collectionsOverTime}
+            </Typography>
+            <Chip
+              icon={<TrendingUpIcon sx={{ fontSize: 16, color: `${COLORS.status.collected.text} !important` }} />}
+              label="+12% vs. mes pasado"
+              size="small"
+              sx={{ bgcolor: COLORS.status.collected.bg, color: COLORS.status.collected.text, fontWeight: 700 }}
+            />
+          </Stack>
+          <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="chart-range-label">{strings.dashboard.filterRange}</InputLabel>
+              <Select
+                labelId="chart-range-label"
+                label={strings.dashboard.filterRange}
+                value={rangeFilter}
+                onChange={(e: SelectChangeEvent) => setRangeFilter(e.target.value as WeekRange)}
+              >
+                <MenuItem value="all">{strings.dashboard.all}</MenuItem>
+                <MenuItem value="3m">{strings.dashboard.range3m}</MenuItem>
+                <MenuItem value="6m">{strings.dashboard.range6m}</MenuItem>
+                <MenuItem value="1y">{strings.dashboard.range1y}</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="chart-neighborhood-label">{strings.dashboard.filterNeighborhood}</InputLabel>
+              <Select
+                labelId="chart-neighborhood-label"
+                label={strings.dashboard.filterNeighborhood}
+                value={neighborhoodFilter}
+                onChange={(e: SelectChangeEvent) => setNeighborhoodFilter(e.target.value)}
+              >
+                <MenuItem value="">{strings.dashboard.all}</MenuItem>
+                {stats.pdrs_by_neighborhood.map((n) => (
+                  <MenuItem key={n.neighborhood} value={n.neighborhood}>
+                    {n.neighborhood}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="chart-category-label">{strings.dashboard.filterCategory}</InputLabel>
+              <Select
+                labelId="chart-category-label"
+                label={strings.dashboard.filterCategory}
+                value={categoryFilter}
+                onChange={(e: SelectChangeEvent) => setCategoryFilter(e.target.value)}
+              >
+                <MenuItem value="">{strings.dashboard.all}</MenuItem>
+                {stats.pdrs_by_category.map((c) => (
+                  <MenuItem key={c.category} value={c.category}>
+                    {c.category}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+          {chartLoading || !chartWeeks ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : chartWeeks.length > 0 ? (
             <BarChart
               height={300}
               xAxis={[{
-                data: stats.collections_by_week.map((w) => weekLabel(w.year, w.week)),
+                data: chartWeeks.map((w) => weekLabel(w.year, w.week)),
                 scaleType: "band",
                 label: strings.dashboard.weekLabel,
               }]}
               series={[{
-                data: stats.collections_by_week.map((w) => w.collected),
+                data: chartWeeks.map((w) => w.collected),
                 label: strings.collectionPass.statuses.collected,
                 color: COLORS.status.collected.dot,
               }]}
               borderRadius={6}
             />
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <Typography sx={{ color: COLORS.muted, fontSize: 13.5 }}>—</Typography>
+          )}
+        </CardContent>
+      </Card>
 
       <Grid container spacing={2}>
         {/* PDRs by community */}

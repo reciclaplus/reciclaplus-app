@@ -194,6 +194,13 @@ export const strings = {
     latestWeekStatus: "Estado última semana",
     rangeLabel: "Últimas 8 semanas",
     totalPoints: "puntos",
+    filterRange: "Periodo",
+    filterNeighborhood: "Barrio",
+    filterCategory: "Categoría",
+    all: "Todo",
+    range3m: "3 meses",
+    range6m: "6 meses",
+    range1y: "1 año",
   },
   weights: {
     title: "Registro de peso",
