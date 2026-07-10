@@ -61,8 +61,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
 
-function weekLabel(_year: number, week: number): string {
-  return `S${week}`;
+function weekLabel(year: number, week: number): string {
+  return `S${week}'${String(year).slice(-2)}`;
 }
 
 function KpiTile({
