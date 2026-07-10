@@ -125,6 +125,8 @@ export const strings = {
     showing: "Mostrando",
     of: "de",
     noHistory: "Sin registrar",
+    statusAlert: "Alerta",
+    filterAlertOnly: "Solo alerta",
   },
   mapPage: {
     title: "Mapa de puntos",

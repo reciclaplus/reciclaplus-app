@@ -16,3 +16,6 @@ export const STATUS_PILL_COLORS: Record<Status, { bg: string; text: string }> = 
   unavailable: { bg: "#fbe3e3", text: "#c62828" },
   closed: { bg: "#eef1ec", text: "#7a867b" },
 };
+
+/** Pill colors for the "alerta" state: no `collected` status in the last 5 weeks. */
+export const ALERT_PILL_COLORS = { bg: "#c62828", text: "#ffffff" };

@@ -27,7 +27,7 @@ import { apiFetch } from "@/lib/api";
 import { hasRole } from "@/lib/roles";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
-import { STATUS_PILL_COLORS } from "@/lib/collection-status";
+import { ALERT_PILL_COLORS, STATUS_PILL_COLORS } from "@/lib/collection-status";
 import { buildBarrioColorMap, getBarrioColor } from "@/lib/barrio-colors";
 import { mondayOfWeek } from "@/lib/week";
 import type { PdrWithHistory, TownDetail, WeekStatus } from "@/lib/types";
@@ -57,6 +57,21 @@ function StatusPill({ status }: { status: keyof typeof strings.collectionPass.st
   );
 }
 
+function AlertPill() {
+  return (
+    <Chip
+      label={strings.list.statusAlert}
+      size="small"
+      sx={{
+        bgcolor: ALERT_PILL_COLORS.bg,
+        color: ALERT_PILL_COLORS.text,
+        fontWeight: 800,
+        fontSize: 11.5,
+      }}
+    />
+  );
+}
+
 function HistoryStrip({ history }: { history: WeekStatus[] }) {
   const slots = Array.from({ length: 5 }, (_, i) => history[history.length - 5 + i]);
   return (
@@ -79,6 +94,11 @@ interface PdrRow extends PdrWithHistory {
   lastWeekLabel: string;
   lastWeekSort: number;
   lastStatus: WeekStatus["status"] | "";
+  noCollectionAlert: boolean;
+}
+
+function hasNoCollectionAlert(p: PdrWithHistory): boolean {
+  return !p.recent_collections.some((ws) => ws.status === "collected");
 }
 
 function PdrList() {
@@ -91,6 +111,7 @@ function PdrList() {
   const [towns, setTowns] = useState<TownDetail[]>([]);
   const [activeBarrio, setActiveBarrio] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeAlertOnly, setActiveAlertOnly] = useState(false);
   const [editTarget, setEditTarget] = useState<PdrWithHistory | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<PdrWithHistory>>({});
   const [saving, setSaving] = useState(false);
@@ -125,9 +146,10 @@ function PdrList() {
     return pdrs.filter((p) => {
       const matchesBarrio = !activeBarrio || p.neighborhood === activeBarrio;
       const matchesCategory = !activeCategory || p.category === activeCategory;
-      return matchesBarrio && matchesCategory;
+      const matchesAlert = !activeAlertOnly || hasNoCollectionAlert(p);
+      return matchesBarrio && matchesCategory && matchesAlert;
     });
-  }, [pdrs, activeBarrio, activeCategory]);
+  }, [pdrs, activeBarrio, activeCategory, activeAlertOnly]);
 
   const rows: PdrRow[] = useMemo(
     () =>
@@ -139,6 +161,7 @@ function PdrList() {
           lastWeekLabel: lastWeek ? formatMondayDate(lastWeek) : strings.list.noHistory,
           lastWeekSort: lastWeek ? lastWeek.year * 100 + lastWeek.week : -1,
           lastStatus: lastWeek?.status ?? "",
+          noCollectionAlert: hasNoCollectionAlert(p),
         };
       }),
     [filtered, barrioColorMap],
@@ -265,7 +288,11 @@ function PdrList() {
         width: 130,
         renderCell: (params: GridRenderCellParams<PdrRow>) => (
           <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
-            {params.row.lastStatus ? <StatusPill status={params.row.lastStatus} /> : null}
+            {params.row.noCollectionAlert ? (
+              <AlertPill />
+            ) : params.row.lastStatus ? (
+              <StatusPill status={params.row.lastStatus} />
+            ) : null}
           </Box>
         ),
       },
@@ -331,66 +358,45 @@ function PdrList() {
         )}
       </Stack>
 
-      <Stack spacing={0.75}>
-        <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
-          {strings.list.colNeighborhood}
-        </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <Chip
-            label={strings.list.allBarrios}
-            onClick={() => updateBarrio(null)}
-            sx={{
-              fontWeight: 700,
-              bgcolor: activeBarrio === null ? COLORS.emeraldEnd : "#fff",
-              color: activeBarrio === null ? "#fff" : COLORS.body,
-              border: `1px solid ${activeBarrio === null ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
-            }}
-          />
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { xs: "stretch", sm: "center" } }}>
+        <TextField
+          select
+          label={strings.list.colNeighborhood}
+          value={activeBarrio ?? ""}
+          onChange={(e) => updateBarrio(e.target.value || null)}
+          size="small"
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">{strings.list.allBarrios}</MenuItem>
           {allNeighborhoods.map((n) => (
-            <Chip
-              key={n}
-              label={n}
-              onClick={() => updateBarrio(n)}
-              sx={{
-                fontWeight: 700,
-                bgcolor: activeBarrio === n ? COLORS.emeraldEnd : "#fff",
-                color: activeBarrio === n ? "#fff" : COLORS.body,
-                border: `1px solid ${activeBarrio === n ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
-              }}
-            />
+            <MenuItem key={n} value={n}>{n}</MenuItem>
           ))}
-        </Box>
-      </Stack>
+        </TextField>
 
-      <Stack spacing={0.75}>
-        <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
-          {strings.list.colCategory}
-        </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <Chip
-            label={strings.list.allCategories}
-            onClick={() => updateCategory(null)}
-            sx={{
-              fontWeight: 700,
-              bgcolor: activeCategory === null ? COLORS.emeraldEnd : "#fff",
-              color: activeCategory === null ? "#fff" : COLORS.body,
-              border: `1px solid ${activeCategory === null ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
-            }}
-          />
+        <TextField
+          select
+          label={strings.list.colCategory}
+          value={activeCategory ?? ""}
+          onChange={(e) => updateCategory(e.target.value || null)}
+          size="small"
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">{strings.list.allCategories}</MenuItem>
           {allCategories.map((c) => (
-            <Chip
-              key={c}
-              label={c}
-              onClick={() => updateCategory(c)}
-              sx={{
-                fontWeight: 700,
-                bgcolor: activeCategory === c ? COLORS.emeraldEnd : "#fff",
-                color: activeCategory === c ? "#fff" : COLORS.body,
-                border: `1px solid ${activeCategory === c ? COLORS.emeraldEnd : COLORS.hairlineSoft}`,
-              }}
-            />
+            <MenuItem key={c} value={c}>{c}</MenuItem>
           ))}
-        </Box>
+        </TextField>
+
+        <Chip
+          label={strings.list.filterAlertOnly}
+          onClick={() => setActiveAlertOnly((v) => !v)}
+          sx={{
+            fontWeight: 700,
+            bgcolor: activeAlertOnly ? ALERT_PILL_COLORS.bg : "#fff",
+            color: activeAlertOnly ? ALERT_PILL_COLORS.text : COLORS.body,
+            border: `1px solid ${activeAlertOnly ? ALERT_PILL_COLORS.bg : COLORS.hairlineSoft}`,
+          }}
+        />
       </Stack>
 
       {loading ? (
