@@ -14,7 +14,6 @@ import MenuItem from "@mui/material/MenuItem";
 import Select, { type SelectChangeEvent } from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { BarChart } from "@mui/x-charts/BarChart";
 import { PieChart } from "@mui/x-charts/PieChart";
 import { PermissionGuard } from "@/components/PermissionGuard";
@@ -209,17 +208,9 @@ function Dashboard() {
       {/* Weekly bar chart */}
       <Card>
         <CardContent>
-          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 1, flexWrap: "wrap", gap: 1 }}>
-            <Typography sx={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
-              {strings.dashboard.collectionsOverTime}
-            </Typography>
-            <Chip
-              icon={<TrendingUpIcon sx={{ fontSize: 16, color: `${COLORS.status.collected.text} !important` }} />}
-              label="+12% vs. mes pasado"
-              size="small"
-              sx={{ bgcolor: COLORS.status.collected.bg, color: COLORS.status.collected.text, fontWeight: 700 }}
-            />
-          </Stack>
+          <Typography sx={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink, mb: 1 }}>
+            {strings.dashboard.collectionsOverTime}
+          </Typography>
           <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", gap: 1.5, mb: 2 }}>
             <FormControl size="small" sx={{ minWidth: 140 }}>
               <InputLabel id="chart-range-label">{strings.dashboard.filterRange}</InputLabel>
