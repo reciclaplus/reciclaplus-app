@@ -184,7 +184,7 @@ function Dashboard() {
           {strings.dashboard.title}
         </Typography>
         <Chip
-          label={strings.dashboard.rangeLabel}
+          label={strings.dashboard.downloadReportLabel}
           sx={{ bgcolor: "#fff", border: `1px solid ${COLORS.hairlineSoft}`, fontWeight: 700, color: COLORS.body }}
         />
       </Stack>
