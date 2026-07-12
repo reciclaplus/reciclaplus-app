@@ -192,7 +192,7 @@ export const strings = {
     pdrsByNeighborhood: "PDRs por barrio",
     pdrsByCategory: "PDRs por categoría",
     latestWeekStatus: "Estado última semana",
-    rangeLabel: "Últimas 8 semanas",
+    downloadReportLabel: "Descargar informe",
     totalPoints: "puntos",
     filterRange: "Periodo",
     filterNeighborhood: "Barrio",
