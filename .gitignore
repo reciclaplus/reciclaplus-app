@@ -8,3 +8,11 @@
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Claude Code local state (launch.json is tracked on purpose so worktrees inherit it)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# Service account keys (never commit)
+*firebase-adminsdk*.json

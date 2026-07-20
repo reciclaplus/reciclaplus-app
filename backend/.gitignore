@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# FastAPI Cloud local link config
+.fastapicloud/
+
 # Python
 __pycache__/
 *.py[cod]

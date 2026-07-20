@@ -2,7 +2,8 @@
 
 Stateless backend: no server-side session storage. Auth state lives in the
 Supabase JWT carried as a bearer token. CORS origins are strictly whitelisted
-per environment (no wildcards).
+per environment (no wildcards in production; CORS_ORIGIN_REGEX is only meant
+for the shared test backend matching Vercel's per-branch preview subdomains).
 """
 
 from fastapi import FastAPI
@@ -16,6 +17,7 @@ app = FastAPI(title="ReciclApp API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

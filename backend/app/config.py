@@ -33,6 +33,10 @@ class Settings:
         if origin.strip()
     ]
 
+    # Optional regex for CORS origins (e.g. matching per-branch Vercel preview
+    # subdomains). Leave unset in production; CORS_ORIGINS alone stays exact-match.
+    cors_origin_regex: str | None = os.environ.get("CORS_ORIGIN_REGEX") or None
+
     @property
     def jwks_url(self) -> str:
         return f"{self.supabase_url}/auth/v1/.well-known/jwks.json"
