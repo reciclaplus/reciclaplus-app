@@ -50,6 +50,9 @@ export const strings = {
   common: {
     loading: "Cargando...",
     noAccess: "No tienes permiso para ver esta página.",
+    notProvisioned:
+      "Tu cuenta aún no tiene acceso a la plataforma. Pide a un administrador que te dé acceso con este correo.",
+    signOut: "Cerrar sesión",
     save: "Guardar",
     saving: "Guardando...",
     required: "Este campo es obligatorio",
