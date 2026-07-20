@@ -11,6 +11,14 @@ export const strings = {
     description:
       "Administra puntos de recogida, registra las pasadas semanales y visualiza el impacto del reciclaje.",
     signInWithGoogle: "Iniciar sesión con Google",
+    // Dev-only email/password login (test environment only — never production).
+    devLogin: {
+      title: "Acceso de prueba",
+      email: "Correo electrónico",
+      password: "Contraseña",
+      submit: "Entrar",
+      error: "No se pudo iniciar sesión. Revisa el correo y la contraseña.",
+    },
   },
   home: {
     title: "Inicio",
