@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -9,17 +9,16 @@ import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
 import { strings } from "@/lib/strings";
+import { COLORS } from "@/lib/theme";
+
+const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
 
 const PLASTIC_TYPES = ["pet", "hdpe", "pp", "trash"] as const;
 type PlasticType = (typeof PLASTIC_TYPES)[number];
@@ -59,6 +58,32 @@ function WeightsForm() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+
+  const columns: GridColDef<WeightEntry>[] = useMemo(
+    () => [
+      {
+        field: "date",
+        headerName: strings.weights.date,
+        width: 140,
+        type: "date",
+        valueGetter: (_value, row) => new Date(row.date),
+        valueFormatter: (_value, row) => formatDate(row.date),
+      },
+      {
+        field: "plastic_type",
+        headerName: strings.weights.plasticType,
+        width: 160,
+        valueGetter: (_value, row) => strings.weights.plasticTypes[row.plastic_type],
+      },
+      {
+        field: "weight_lbs",
+        headerName: strings.weights.weightLbs,
+        width: 140,
+        type: "number",
+      },
+    ],
+    [],
+  );
 
   async function loadEntries() {
     try {
@@ -178,28 +203,26 @@ function WeightsForm() {
         ) : entries.length === 0 ? (
           <Typography color="text.secondary">{strings.weights.empty}</Typography>
         ) : (
-          <TableContainer component={Paper}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{strings.weights.date}</TableCell>
-                  <TableCell>{strings.weights.plasticType}</TableCell>
-                  <TableCell align="right">{strings.weights.weightLbs}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {entries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>{formatDate(entry.date)}</TableCell>
-                    <TableCell>
-                      {strings.weights.plasticTypes[entry.plastic_type]}
-                    </TableCell>
-                    <TableCell align="right">{entry.weight_lbs}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <DataGrid
+            rows={entries}
+            columns={columns}
+            localeText={gridLocaleText}
+            showToolbar
+            autoHeight
+            disableRowSelectionOnClick
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 10 } },
+              sorting: { sortModel: [{ field: "date", sort: "desc" }] },
+            }}
+            sx={{
+              bgcolor: "#fff",
+              borderRadius: "14px",
+              borderColor: COLORS.hairlineSoft,
+              "--DataGrid-containerBackground": COLORS.canvas,
+              "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800, fontSize: 12, color: COLORS.body },
+            }}
+          />
         )}
         </Box>
       </Box>

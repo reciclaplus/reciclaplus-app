@@ -118,27 +118,29 @@ function RouteMarkers({
 
   useEffect(() => {
     if (!map) return;
-    if (livePos) {
-      if (!dotRef.current) {
-        const dot = document.createElement("div");
-        dot.style.width = "16px";
-        dot.style.height = "16px";
-        dot.style.borderRadius = "50%";
-        dot.style.backgroundColor = "#4285F4";
-        dot.style.border = "2px solid #fff";
-        dot.style.boxShadow = "0 0 6px rgba(66,133,244,0.6)";
-        dotRef.current = new google.maps.marker.AdvancedMarkerElement({
-          map,
-          content: dot,
-          zIndex: 200,
-        });
-      }
-      dotRef.current.position = livePos;
-    }
     return () => {
       if (dotRef.current) dotRef.current.map = null;
       dotRef.current = null;
     };
+  }, [map]);
+
+  useEffect(() => {
+    if (!map || !livePos) return;
+    if (!dotRef.current) {
+      const dot = document.createElement("div");
+      dot.style.width = "16px";
+      dot.style.height = "16px";
+      dot.style.borderRadius = "50%";
+      dot.style.backgroundColor = "#4285F4";
+      dot.style.border = "2px solid #fff";
+      dot.style.boxShadow = "0 0 6px rgba(66,133,244,0.6)";
+      dotRef.current = new google.maps.marker.AdvancedMarkerElement({
+        map,
+        content: dot,
+        zIndex: 200,
+      });
+    }
+    dotRef.current.position = livePos;
   }, [map, livePos]);
 
   return null;
@@ -149,6 +151,18 @@ function MapController({ center }: { center: { lat: number; lng: number } | null
   useEffect(() => {
     if (map && center) map.panTo(center);
   }, [map, center]);
+  return null;
+}
+
+function MapRefCapture({
+  mapRef,
+}: {
+  mapRef: React.MutableRefObject<google.maps.Map | null>;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    mapRef.current = map;
+  }, [map, mapRef]);
   return null;
 }
 
@@ -171,6 +185,7 @@ function CollectionRoute() {
   const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState(false);
   const [showMap, setShowMap] = useState(true);
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   // Geo
   useEffect(() => {
@@ -408,6 +423,7 @@ function CollectionRoute() {
                 livePos={livePos}
               />
               <MapController center={currentStop ? { lat: currentStop.lat, lng: currentStop.lng } : null} />
+              <MapRefCapture mapRef={mapRef} />
             </GoogleMap>
           </APIProvider>
         ) : (
@@ -418,9 +434,7 @@ function CollectionRoute() {
         {/* Recenter button */}
         {livePos && (
           <IconButton
-            onClick={() => {
-              // recenter handled via map ref if needed
-            }}
+            onClick={() => mapRef.current?.panTo(livePos)}
             sx={{
               position: "absolute",
               bottom: 16,
