@@ -16,3 +16,10 @@ Thumbs.db
 
 # Service account keys (never commit)
 *firebase-adminsdk*.json
+
+# Firestore migration scripts / data dumps (one-off, not part of the app)
+backend/export_firestore.py
+backend/import_firestore_collections.py
+backend/import_firestore_pdrs.py
+backend/import_firestore_weights.py
+backend/firestore_*.json
