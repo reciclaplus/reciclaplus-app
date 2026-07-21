@@ -88,9 +88,19 @@ Practical rules:
 
 ## Environments
 
-| Environment | Frontend          | Backend               |
-| ----------- | ----------------- | --------------------- |
-| Development | `localhost:3000`  | `localhost:8000`      |
-| Production  | `reciclaplus.com` | `api.reciclaplus.com` |
+| Environment | Frontend                        | Backend                          |
+| ----------- | -------------------------------- | --------------------------------- |
+| Development | `localhost:3000`                 | `localhost:8000`                  |
+| Testing     | Vercel preview (per git branch)  | FastAPI Cloud (shared test app)   |
+| Production  | `reciclaplus.com`                | `api.reciclaplus.com`             |
 
 Each environment has its own Supabase project — development never touches production data. Per-environment config (Supabase URL/keys, OAuth credentials, CORS origins, cookie flags) lives in environment variables — never committed.
+
+### Testing environment
+
+For trying out changes without touching real data: a dedicated Supabase project (`reciclapp-test`) holds the same schema (kept in sync via the same `supabase/migrations/` files), a single persistent FastAPI Cloud deployment serves as the shared test backend, and Vercel gives every pushed git branch an automatic preview URL wired to that backend.
+
+- To point local dev at the test stack instead of real data, copy the commented "Testing environment" block in [frontend/.env.local.example](frontend/.env.local.example) and [backend/.env.example](backend/.env.example) over the defaults.
+- The backend supports an optional `CORS_ORIGIN_REGEX` env var (see [backend/app/config.py](backend/app/config.py)) so the shared test deployment can allow all `*.vercel.app` preview subdomains — production keeps the exact-match `CORS_ORIGINS` list only, per the no-wildcards rule above.
+- Every Claude Code worktree under `.claude/worktrees/` shares the same test backend and test database. After creating a worktree, run `node scripts/worktree-ports.js` once from its root to bootstrap it: it assigns the worktree a unique frontend/backend port pair (rewriting its `.claude/launch.json`) so parallel worktrees don't collide on 3000/8000, and — since `git worktree add` only checks out tracked files — copies the gitignored env files (`frontend/.env.local`, `backend/.env`) from the main checkout, pointing `NEXT_PUBLIC_API_BASE_URL` at the worktree's own backend port (a shared cloud test-backend URL is left untouched). It never overwrites existing env files and is safe to re-run. The main checkout always stays on 3000/8000 and its env files are left alone.
+- To test authenticated pages locally without Google OAuth, set `NEXT_PUBLIC_ENABLE_DEV_LOGIN=true` (test env only — never production) to enable the email/password login on the landing page. It requires a Supabase auth user **and** a matching `public.users` row (the two are decoupled), both in the test project.
