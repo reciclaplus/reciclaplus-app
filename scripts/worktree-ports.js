@@ -2,18 +2,26 @@
 /**
  * worktree-ports.js
  *
- * Assigns the current git worktree a unique frontend/backend local port pair
- * and rewrites its .claude/launch.json so several worktrees can run dev servers
- * at once without colliding on 3000/8000.
- *
- * Run once, from the worktree root, after creating a worktree:
+ * Bootstraps a git worktree for local dev. Run once, from the worktree root,
+ * after creating a worktree:
  *
  *     node scripts/worktree-ports.js
  *
+ * It does three things (worktrees only):
+ *   1. Assigns a unique frontend/backend local port pair (deterministic from
+ *      the worktree name) and rewrites .claude/launch.json, so several
+ *      worktrees can run dev servers at once without colliding on 3000/8000.
+ *   2. Copies the gitignored env files (frontend/.env.local, backend/.env)
+ *      from the main checkout if this worktree doesn't have them yet — git
+ *      worktree add only checks out tracked files, so these never come along.
+ *   3. Rewrites NEXT_PUBLIC_API_BASE_URL in the copied frontend/.env.local to
+ *      this worktree's backend port, but only when it points at localhost (a
+ *      shared cloud test-backend URL is left untouched).
+ *
  * The main checkout (any path not under .claude/worktrees/) always stays on
- * 3000/8000 and is left untouched. Every other worktree gets a deterministic
- * pair derived from its directory name, so re-running is idempotent and the
- * same worktree always maps to the same ports.
+ * 3000/8000 and its env files are left untouched. Everything is idempotent:
+ * re-running maps the same worktree to the same ports and never clobbers an
+ * env file that already exists in the worktree.
  *
  * No dependencies — plain Node, CommonJS.
  */
@@ -93,6 +101,64 @@ function main() {
   console.log(`Frontend: ${frontendPort}`);
   console.log(`Backend:  ${backendPort}`);
   console.log(`Updated ${launchPath}`);
+
+  if (isWorktree) {
+    provisionEnvFiles(normalized, backendPort);
+  }
+}
+
+// Gitignored env files that git worktree add does not copy. Paths are relative
+// to a checkout root.
+const ENV_FILES = ["frontend/.env.local", "backend/.env"];
+
+/**
+ * Copy the gitignored env files from the main checkout into this worktree if
+ * they are missing, then point the frontend's API base URL at this worktree's
+ * backend port. `normalizedCwd` uses forward slashes (fs accepts them on
+ * Windows too).
+ */
+function provisionEnvFiles(normalizedCwd, backendPort) {
+  const mainRoot = normalizedCwd.split("/.claude/worktrees/")[0];
+
+  for (const rel of ENV_FILES) {
+    const dest = `${normalizedCwd}/${rel}`;
+    const src = `${mainRoot}/${rel}`;
+    if (fs.existsSync(dest)) {
+      console.log(`Kept existing ${rel} (not overwritten).`);
+    } else if (fs.existsSync(src)) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+      console.log(`Copied ${rel} from main checkout.`);
+    } else {
+      console.warn(
+        `No ${rel} in the main checkout to copy — set it up from the ` +
+          `matching .example file.`
+      );
+    }
+  }
+
+  rewriteApiBaseUrl(`${normalizedCwd}/frontend/.env.local`, backendPort);
+}
+
+/**
+ * Rewrite NEXT_PUBLIC_API_BASE_URL to use this worktree's backend port, but
+ * only when it targets localhost/127.0.0.1. A shared cloud test-backend URL is
+ * intentionally left alone.
+ */
+function rewriteApiBaseUrl(envPath, backendPort) {
+  if (!fs.existsSync(envPath)) return;
+
+  const original = fs.readFileSync(envPath, "utf8");
+  const pattern =
+    /^(NEXT_PUBLIC_API_BASE_URL=https?:\/\/(?:localhost|127\.0\.0\.1):)(\d+)(.*)$/m;
+  const match = original.match(pattern);
+  if (!match) return; // not set, or a non-localhost URL — leave untouched
+
+  if (match[2] === String(backendPort)) return; // already correct
+
+  const updated = original.replace(pattern, `$1${backendPort}$3`);
+  fs.writeFileSync(envPath, updated);
+  console.log(`Set NEXT_PUBLIC_API_BASE_URL -> localhost:${backendPort}`);
 }
 
 /**
