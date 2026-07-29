@@ -79,19 +79,6 @@ const latestPdrColumns: GridColDef<Pdr>[] = [
     headerName: strings.list.colName,
     flex: 1.4,
     minWidth: 180,
-    renderCell: (params: GridRenderCellParams<Pdr>) => (
-      <Box sx={{ display: "flex", alignItems: "center", height: "100%", minWidth: 0 }}>
-        <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
-          {params.row.name}
-        </Typography>
-      </Box>
-    ),
-  },
-  {
-    field: "description",
-    headerName: strings.list.colDescription,
-    flex: 1,
-    minWidth: 160,
   },
   {
     field: "category",
