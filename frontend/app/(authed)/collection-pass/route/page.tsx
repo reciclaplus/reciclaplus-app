@@ -60,6 +60,23 @@ function sortKey(s: RouteStop): number {
   return s.route_order ?? s.internal_id;
 }
 
+type NearbyPick = { stop: RouteStop; distanceM: number } | null;
+
+/** Nearest unmarked stop worth suggesting at `at`, carrying `prev` for hysteresis. */
+function pickNearby(
+  at: { lat: number; lng: number },
+  candidates: RouteStop[],
+  prev: NearbyPick,
+): NearbyPick {
+  const found = nearestWithinRadius(candidates, at, {
+    enterRadiusM: NEARBY_ENTER_RADIUS_M,
+    exitRadiusM: NEARBY_EXIT_RADIUS_M,
+    previousId: prev?.stop.pdr_id ?? null,
+    idOf: (s) => s.pdr_id,
+  });
+  return found ? { stop: found.item, distanceM: found.distanceM } : null;
+}
+
 // ── Map with markers + live dot ──────────────────────────────────────
 
 function createPinElement(color: string, label: string, size: number): HTMLElement {
@@ -211,21 +228,14 @@ function CollectionRoute() {
     [allStops, statuses],
   );
 
-  // Read from the geolocation callback so marking a stop doesn't tear down and
+  // Read from the geolocation callbacks so marking a stop doesn't tear down and
   // resubscribe the GPS watch on every tap.
   const pendingStopsRef = useRef<RouteStop[]>([]);
   useEffect(() => {
     pendingStopsRef.current = pendingStops;
   }, [pendingStops]);
 
-  // Geo. Deliberately keyed on whether route data has arrived: the watch is set
-  // up before the API responds, and a first fix can land while there are still
-  // no candidates to measure against (a cached fix is allowed in immediately by
-  // `maximumAge`). Without this, that fix computes against an empty list and,
-  // if the operator is standing still, no further fix ever arrives to correct
-  // it — so the suggestion could never appear. Flips once, so the watch is
-  // resubscribed once rather than on every mark.
-  const hasRouteData = allStops.length > 0;
+  // Geo
   useEffect(() => {
     if (!navigator.geolocation) { setGeoError(true); return; }
     const wid = navigator.geolocation.watchPosition(
@@ -235,21 +245,37 @@ function CollectionRoute() {
         // A fix after an earlier failure means location works now, so drop the
         // "activa la ubicación" notice instead of leaving it up for the session.
         setGeoError(false);
-        setNearby((prev) => {
-          const found = nearestWithinRadius(pendingStopsRef.current, next, {
-            enterRadiusM: NEARBY_ENTER_RADIUS_M,
-            exitRadiusM: NEARBY_EXIT_RADIUS_M,
-            previousId: prev?.stop.pdr_id ?? null,
-            idOf: (s) => s.pdr_id,
-          });
-          return found ? { stop: found.item, distanceM: found.distanceM } : null;
-        });
+        setNearby((prev) => pickNearby(next, pendingStopsRef.current, prev));
       },
       () => setGeoError(true),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
     );
     return () => navigator.geolocation.clearWatch(wid);
-  }, [hasRouteData]);
+  }, []);
+
+  // Re-evaluate the suggestion whenever the candidate set changes — route data
+  // arriving, or a stop being marked.
+  //
+  // This is load-bearing, not an optimisation. `watchPosition` only reports
+  // again once the device has actually moved, and the watch is subscribed
+  // before the API responds. A stationary operator therefore gets exactly one
+  // fix, measured against an empty candidate list, and no later fix ever
+  // arrives to correct it — the suggestion could never appear at all. Asking
+  // for the position directly is cheap: `maximumAge` lets the cached fix answer
+  // immediately, without waiting on the GPS.
+  useEffect(() => {
+    if (pendingStops.length === 0 || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const at = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLivePos(at);
+        setGeoError(false);
+        setNearby((prev) => pickNearby(at, pendingStops, prev));
+      },
+      () => {}, // the watch above owns error reporting
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
+    );
+  }, [pendingStops]);
 
   // Load data: try API first, fall back to IndexedDB cache if offline
   useEffect(() => {
