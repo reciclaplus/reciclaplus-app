@@ -246,6 +246,8 @@ export const strings = {
     offline: "Sin conexión",
     unsynced: "sin guardar",
     locationDenied: "Activa la ubicación para ver tu posición en el mapa.",
+    nearbyLabel: "Estás cerca",
+    nearbyGo: "Ir",
     markCollected: "Recogido",
     markEmpty: "Vacío",
     markUnavailable: "No disp.",
