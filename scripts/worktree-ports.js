@@ -17,6 +17,8 @@
  *   3. Rewrites NEXT_PUBLIC_API_BASE_URL in the copied frontend/.env.local to
  *      this worktree's backend port, but only when it points at localhost (a
  *      shared cloud test-backend URL is left untouched).
+ *   4. Adds this worktree's frontend origin to CORS_ORIGINS in backend/.env, so
+ *      the backend accepts calls from the worktree's non-default port.
  *
  * The main checkout (any path not under .claude/worktrees/) always stays on
  * 3000/8000 and its env files are left untouched. Everything is idempotent:
@@ -103,7 +105,7 @@ function main() {
   console.log(`Updated ${launchPath}`);
 
   if (isWorktree) {
-    provisionEnvFiles(normalized, backendPort);
+    provisionEnvFiles(normalized, frontendPort, backendPort);
   }
 }
 
@@ -117,7 +119,7 @@ const ENV_FILES = ["frontend/.env.local", "backend/.env"];
  * backend port. `normalizedCwd` uses forward slashes (fs accepts them on
  * Windows too).
  */
-function provisionEnvFiles(normalizedCwd, backendPort) {
+function provisionEnvFiles(normalizedCwd, frontendPort, backendPort) {
   const mainRoot = normalizedCwd.split("/.claude/worktrees/")[0];
 
   for (const rel of ENV_FILES) {
@@ -138,6 +140,40 @@ function provisionEnvFiles(normalizedCwd, backendPort) {
   }
 
   rewriteApiBaseUrl(`${normalizedCwd}/frontend/.env.local`, backendPort);
+  addCorsOrigins(`${normalizedCwd}/backend/.env`, frontendPort);
+}
+
+/**
+ * Append this worktree's frontend origin to CORS_ORIGINS so the backend accepts
+ * its requests. The main checkout's list only covers 3000, but every worktree
+ * serves the frontend on its own port, so without this every API call fails
+ * CORS. Existing entries are preserved and re-running adds nothing new.
+ */
+function addCorsOrigins(envPath, frontendPort) {
+  if (!fs.existsSync(envPath)) return;
+
+  const original = fs.readFileSync(envPath, "utf8");
+  const pattern = /^CORS_ORIGINS=(.*)$/m;
+  const match = original.match(pattern);
+  if (!match) return; // not set — the backend default already covers localhost
+
+  const existing = match[1]
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const wanted = [
+    `http://localhost:${frontendPort}`,
+    `http://127.0.0.1:${frontendPort}`,
+  ];
+  const missing = wanted.filter((o) => !existing.includes(o));
+  if (missing.length === 0) return;
+
+  const updated = original.replace(
+    pattern,
+    `CORS_ORIGINS=${[...existing, ...missing].join(",")}`
+  );
+  fs.writeFileSync(envPath, updated);
+  console.log(`Added ${missing.join(", ")} to CORS_ORIGINS.`);
 }
 
 /**
