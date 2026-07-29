@@ -232,6 +232,9 @@ function CollectionRoute() {
       (pos) => {
         const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLivePos(next);
+        // A fix after an earlier failure means location works now, so drop the
+        // "activa la ubicación" notice instead of leaving it up for the session.
+        setGeoError(false);
         setNearby((prev) => {
           const found = nearestWithinRadius(pendingStopsRef.current, next, {
             enterRadiusM: NEARBY_ENTER_RADIUS_M,
