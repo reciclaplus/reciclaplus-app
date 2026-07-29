@@ -212,6 +212,12 @@ export const strings = {
     range3m: "3 meses",
     range6m: "6 meses",
     range1y: "1 año",
+    latestPdrs: "Últimos PDRs añadidos",
+    filterAddedWithin: "Añadidos en",
+    last7Days: "Últimos 7 días",
+    last30Days: "Últimos 30 días",
+    last90Days: "Últimos 90 días",
+    latestPdrsEmpty: "No se han añadido PDRs en este periodo.",
   },
   weights: {
     title: "Registro de peso",

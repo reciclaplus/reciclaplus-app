@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
@@ -16,10 +16,15 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { BarChart } from "@mui/x-charts/BarChart";
 import { PieChart } from "@mui/x-charts/PieChart";
+import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid";
+import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
+import type { Pdr } from "@/lib/types";
+
+const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
 
 interface NeighborhoodCount {
   neighborhood: string;
@@ -65,6 +70,49 @@ const STATUS_COLORS: Record<string, string> = {
 const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
 
 type WeekRange = "all" | "3m" | "6m" | "1y";
+
+type AddedWithin = 7 | 30 | 90;
+
+const latestPdrColumns: GridColDef<Pdr>[] = [
+  {
+    field: "name",
+    headerName: strings.list.colName,
+    flex: 1.4,
+    minWidth: 180,
+  },
+  {
+    field: "category",
+    headerName: strings.list.colCategory,
+    width: 140,
+    renderCell: (params: GridRenderCellParams<Pdr>) => (
+      <Chip
+        label={params.row.category}
+        size="small"
+        variant="outlined"
+        sx={{ fontWeight: 700, borderColor: COLORS.hairlineSoft, color: COLORS.body }}
+      />
+    ),
+  },
+  {
+    field: "neighborhood",
+    headerName: strings.list.colNeighborhood,
+    width: 160,
+  },
+  {
+    field: "created_at",
+    headerName: strings.list.colCreatedAt,
+    width: 150,
+    type: "date",
+    valueGetter: (_value, row) => new Date(row.created_at),
+    renderCell: (params: GridRenderCellParams<Pdr>) => (
+      <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLORS.body }}>
+          {new Date(params.row.created_at).toLocaleDateString("es-ES")}
+        </Typography>
+      </Box>
+    ),
+  },
+];
 
 function weekLabel(year: number, week: number): string {
   return `S${week}'${String(year).slice(-2)}`;
@@ -143,12 +191,26 @@ function Dashboard() {
   const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
+  const [pdrs, setPdrs] = useState<Pdr[]>([]);
+  const [addedWithin, setAddedWithin] = useState<AddedWithin>(30);
+
   useEffect(() => {
     apiFetch<DashboardStats>("/dashboard/stats")
       .then(setStats)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    apiFetch<Pdr[]>("/pdrs")
+      .then(setPdrs)
+      .catch(() => setError(true));
+  }, []);
+
+  const latestPdrs = useMemo(() => {
+    const cutoff = Date.now() - addedWithin * 24 * 60 * 60 * 1000;
+    return pdrs.filter((p) => new Date(p.created_at).getTime() >= cutoff);
+  }, [pdrs, addedWithin]);
 
   useEffect(() => {
     setChartLoading(true);
@@ -204,6 +266,59 @@ function Dashboard() {
           <KpiTile label={strings.dashboard.communities} value={stats.pdrs_by_community.length} />
         </Grid>
       </Grid>
+
+      {/* Latest PDRs table */}
+      <Card>
+        <CardContent>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, mb: 2 }}
+          >
+            <Typography sx={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
+              {strings.dashboard.latestPdrs}
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id="added-within-label">{strings.dashboard.filterAddedWithin}</InputLabel>
+              <Select
+                labelId="added-within-label"
+                label={strings.dashboard.filterAddedWithin}
+                value={String(addedWithin)}
+                onChange={(e: SelectChangeEvent) => setAddedWithin(Number(e.target.value) as AddedWithin)}
+              >
+                <MenuItem value="7">{strings.dashboard.last7Days}</MenuItem>
+                <MenuItem value="30">{strings.dashboard.last30Days}</MenuItem>
+                <MenuItem value="90">{strings.dashboard.last90Days}</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+          {latestPdrs.length > 0 ? (
+            <DataGrid
+              rows={latestPdrs}
+              columns={latestPdrColumns}
+              localeText={gridLocaleText}
+              autoHeight
+              disableRowSelectionOnClick
+              pageSizeOptions={[5, 10, 25]}
+              initialState={{
+                pagination: { paginationModel: { pageSize: 5 } },
+                sorting: { sortModel: [{ field: "created_at", sort: "desc" }] },
+              }}
+              sx={{
+                bgcolor: "#fff",
+                borderRadius: "14px",
+                borderColor: COLORS.hairlineSoft,
+                "--DataGrid-containerBackground": COLORS.canvas,
+                "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 800, fontSize: 12, color: COLORS.body },
+              }}
+            />
+          ) : (
+            <Typography sx={{ color: COLORS.muted, fontSize: 13.5 }}>
+              {strings.dashboard.latestPdrsEmpty}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Weekly bar chart */}
       <Card>
