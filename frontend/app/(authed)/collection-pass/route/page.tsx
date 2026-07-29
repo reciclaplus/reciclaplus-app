@@ -198,11 +198,34 @@ function CollectionRoute() {
 
   // Nearest unmarked PDR to the operator, recomputed on every position fix.
   const [nearby, setNearby] = useState<{ stop: RouteStop; distanceM: number } | null>(null);
-  // Read only from the geolocation callback, so the watch can stay subscribed
-  // across route changes instead of resubscribing whenever a stop is marked.
-  const pendingStopsRef = useRef<RouteStop[]>([]);
 
-  // Geo
+  // Candidates for the nearby suggestion: unmarked stops across every barrio,
+  // not just the selected one — being physically near a point in a barrio you
+  // haven't selected yet is exactly the case worth surfacing. Marked stops are
+  // excluded; suggesting a point already dealt with is noise.
+  //
+  // Declared above the geo effect so the ref is always populated before that
+  // effect (re)subscribes — effects in a commit run in declaration order.
+  const pendingStops = useMemo(
+    () => allStops.filter((s) => (statuses[s.pdr_id] ?? null) === null),
+    [allStops, statuses],
+  );
+
+  // Read from the geolocation callback so marking a stop doesn't tear down and
+  // resubscribe the GPS watch on every tap.
+  const pendingStopsRef = useRef<RouteStop[]>([]);
+  useEffect(() => {
+    pendingStopsRef.current = pendingStops;
+  }, [pendingStops]);
+
+  // Geo. Deliberately keyed on whether route data has arrived: the watch is set
+  // up before the API responds, and a first fix can land while there are still
+  // no candidates to measure against (a cached fix is allowed in immediately by
+  // `maximumAge`). Without this, that fix computes against an empty list and,
+  // if the operator is standing still, no further fix ever arrives to correct
+  // it — so the suggestion could never appear. Flips once, so the watch is
+  // resubscribed once rather than on every mark.
+  const hasRouteData = allStops.length > 0;
   useEffect(() => {
     if (!navigator.geolocation) { setGeoError(true); return; }
     const wid = navigator.geolocation.watchPosition(
@@ -223,7 +246,7 @@ function CollectionRoute() {
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
     );
     return () => navigator.geolocation.clearWatch(wid);
-  }, []);
+  }, [hasRouteData]);
 
   // Load data: try API first, fall back to IndexedDB cache if offline
   useEffect(() => {
@@ -325,19 +348,6 @@ function CollectionRoute() {
   const currentIdx = stops.findIndex((s) => s.pdr_id === currentId);
 
   // ── Nearby PDR suggestion ──────────────────────────────────────────
-  // Searched across every barrio, not just the selected one: being physically
-  // near a point in a barrio you haven't selected yet is exactly the case
-  // worth surfacing. Only unmarked stops are considered — suggesting a point
-  // that was already dealt with is noise.
-  const pendingStops = useMemo(
-    () => allStops.filter((s) => (statuses[s.pdr_id] ?? null) === null),
-    [allStops, statuses],
-  );
-
-  useEffect(() => {
-    pendingStopsRef.current = pendingStops;
-  }, [pendingStops]);
-
   // `nearby` only refreshes on a position fix, so re-check freshness here:
   // hide it once it becomes the point being worked on, or once it is marked
   // (otherwise a just-marked stop would linger until the next GPS tick).
