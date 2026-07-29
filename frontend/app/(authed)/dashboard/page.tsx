@@ -84,13 +84,14 @@ const latestPdrColumns: GridColDef<Pdr>[] = [
         <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
           {params.row.name}
         </Typography>
-        {params.row.description && (
-          <Typography noWrap sx={{ fontSize: 12, fontWeight: 500, color: COLORS.muted, ml: 1 }}>
-            {params.row.description}
-          </Typography>
-        )}
       </Box>
     ),
+  },
+  {
+    field: "description",
+    headerName: strings.list.colDescription,
+    flex: 1,
+    minWidth: 160,
   },
   {
     field: "category",
@@ -104,11 +105,6 @@ const latestPdrColumns: GridColDef<Pdr>[] = [
         sx={{ fontWeight: 700, borderColor: COLORS.hairlineSoft, color: COLORS.body }}
       />
     ),
-  },
-  {
-    field: "community",
-    headerName: strings.list.colCommunity,
-    width: 150,
   },
   {
     field: "neighborhood",
