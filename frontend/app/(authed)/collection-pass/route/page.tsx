@@ -16,6 +16,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import MapIcon from "@mui/icons-material/Map";
 import MapOffIcon from "@mui/icons-material/LayersClear";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
+import NearMeIcon from "@mui/icons-material/NearMe";
 import {
   APIProvider,
   Map as GoogleMap,
@@ -28,8 +29,16 @@ import { type Status, STATUS_COLORS } from "@/lib/collection-status";
 import { type IsoWeek, formatWeekLabel } from "@/lib/week";
 import type { Pdr } from "@/lib/types";
 import { enqueueMark, getOutbox, clearAllOutbox, cacheWeek, getCachedWeek } from "@/lib/route/outbox";
+import { nearestWithinRadius, formatDistance } from "@/lib/geo";
+import { COLORS } from "@/lib/theme";
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
+
+/** A pending PDR closer than this suggests itself to the operator. */
+const NEARBY_ENTER_RADIUS_M = 200;
+/** ...and stays suggested until it drifts past this, so GPS jitter at the
+ *  boundary doesn't make the banner blink. */
+const NEARBY_EXIT_RADIUS_M = 250;
 
 interface PassRow {
   pdr_id: string;
@@ -49,6 +58,23 @@ interface RouteStop extends PassRow {
 
 function sortKey(s: RouteStop): number {
   return s.route_order ?? s.internal_id;
+}
+
+type NearbyPick = { stop: RouteStop; distanceM: number } | null;
+
+/** Nearest unmarked stop worth suggesting at `at`, carrying `prev` for hysteresis. */
+function pickNearby(
+  at: { lat: number; lng: number },
+  candidates: RouteStop[],
+  prev: NearbyPick,
+): NearbyPick {
+  const found = nearestWithinRadius(candidates, at, {
+    enterRadiusM: NEARBY_ENTER_RADIUS_M,
+    exitRadiusM: NEARBY_EXIT_RADIUS_M,
+    previousId: prev?.stop.pdr_id ?? null,
+    idOf: (s) => s.pdr_id,
+  });
+  return found ? { stop: found.item, distanceM: found.distanceM } : null;
 }
 
 // ── Map with markers + live dot ──────────────────────────────────────
@@ -187,16 +213,69 @@ function CollectionRoute() {
   const [showMap, setShowMap] = useState(true);
   const mapRef = useRef<google.maps.Map | null>(null);
 
+  // Nearest unmarked PDR to the operator, recomputed on every position fix.
+  const [nearby, setNearby] = useState<{ stop: RouteStop; distanceM: number } | null>(null);
+
+  // Candidates for the nearby suggestion: unmarked stops across every barrio,
+  // not just the selected one — being physically near a point in a barrio you
+  // haven't selected yet is exactly the case worth surfacing. Marked stops are
+  // excluded; suggesting a point already dealt with is noise.
+  //
+  // Declared above the geo effect so the ref is always populated before that
+  // effect (re)subscribes — effects in a commit run in declaration order.
+  const pendingStops = useMemo(
+    () => allStops.filter((s) => (statuses[s.pdr_id] ?? null) === null),
+    [allStops, statuses],
+  );
+
+  // Read from the geolocation callbacks so marking a stop doesn't tear down and
+  // resubscribe the GPS watch on every tap.
+  const pendingStopsRef = useRef<RouteStop[]>([]);
+  useEffect(() => {
+    pendingStopsRef.current = pendingStops;
+  }, [pendingStops]);
+
   // Geo
   useEffect(() => {
     if (!navigator.geolocation) { setGeoError(true); return; }
     const wid = navigator.geolocation.watchPosition(
-      (pos) => setLivePos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => {
+        const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLivePos(next);
+        // A fix after an earlier failure means location works now, so drop the
+        // "activa la ubicación" notice instead of leaving it up for the session.
+        setGeoError(false);
+        setNearby((prev) => pickNearby(next, pendingStopsRef.current, prev));
+      },
       () => setGeoError(true),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
     );
     return () => navigator.geolocation.clearWatch(wid);
   }, []);
+
+  // Re-evaluate the suggestion whenever the candidate set changes — route data
+  // arriving, or a stop being marked.
+  //
+  // This is load-bearing, not an optimisation. `watchPosition` only reports
+  // again once the device has actually moved, and the watch is subscribed
+  // before the API responds. A stationary operator therefore gets exactly one
+  // fix, measured against an empty candidate list, and no later fix ever
+  // arrives to correct it — the suggestion could never appear at all. Asking
+  // for the position directly is cheap: `maximumAge` lets the cached fix answer
+  // immediately, without waiting on the GPS.
+  useEffect(() => {
+    if (pendingStops.length === 0 || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const at = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLivePos(at);
+        setGeoError(false);
+        setNearby((prev) => pickNearby(at, pendingStops, prev));
+      },
+      () => {}, // the watch above owns error reporting
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
+    );
+  }, [pendingStops]);
 
   // Load data: try API first, fall back to IndexedDB cache if offline
   useEffect(() => {
@@ -280,14 +359,45 @@ function CollectionRoute() {
   const markedCount = stops.filter((s) => s.status !== null).length;
   const collectedCount = stops.filter((s) => s.status === "collected").length;
 
-  // Auto-select first pending stop when barrio changes
+  // Auto-select first pending stop when barrio changes. A stop explicitly
+  // requested via the nearby banner wins, since selecting it may itself be what
+  // switched the barrio and recomputed `stops`.
+  const desiredIdRef = useRef<string | null>(null);
   useEffect(() => {
+    if (desiredIdRef.current && stops.some((s) => s.pdr_id === desiredIdRef.current)) {
+      setCurrentId(desiredIdRef.current);
+      desiredIdRef.current = null;
+      return;
+    }
     const firstPending = stops.find((s) => s.status === null);
     setCurrentId(firstPending?.pdr_id ?? stops[stops.length - 1]?.pdr_id ?? null);
   }, [stops]);
 
   const currentStop = stops.find((s) => s.pdr_id === currentId) ?? null;
   const currentIdx = stops.findIndex((s) => s.pdr_id === currentId);
+
+  // ── Nearby PDR suggestion ──────────────────────────────────────────
+  // `nearby` only refreshes on a position fix, so re-check freshness here:
+  // hide it once it becomes the point being worked on, or once it is marked
+  // (otherwise a just-marked stop would linger until the next GPS tick).
+  const nearbySuggestion =
+    nearby &&
+    nearby.stop.pdr_id !== currentId &&
+    (statuses[nearby.stop.pdr_id] ?? null) === null
+      ? nearby
+      : null;
+
+  function goToNearby() {
+    if (!nearbySuggestion) return;
+    const { stop } = nearbySuggestion;
+    if (stop.neighborhood !== selectedBarrio) {
+      // Switching barrio recomputes `stops`, which would otherwise make the
+      // auto-select effect override this pick with the barrio's first pending.
+      desiredIdRef.current = stop.pdr_id;
+      setSelectedBarrio(stop.neighborhood);
+    }
+    setCurrentId(stop.pdr_id);
+  }
 
   // Mark a stop — persist to IndexedDB outbox immediately
   function markStop(pdr_id: string, status: Status) {
@@ -498,6 +608,42 @@ function CollectionRoute() {
           <Alert severity="info" sx={{ mb: 1, py: 0 }}>
             {strings.collectionRoute.locationDenied}
           </Alert>
+        )}
+
+        {/* Nearby PDR suggestion — never steals the current selection, only offers */}
+        {nearbySuggestion && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              mb: 1.5,
+              px: 1.5,
+              py: 1,
+              borderRadius: 2,
+              bgcolor: COLORS.limeSoft,
+              border: "1px solid",
+              borderColor: COLORS.hairlineSoft,
+            }}
+          >
+            <NearMeIcon fontSize="small" sx={{ color: COLORS.emeraldStart }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="caption" sx={{ display: "block", color: COLORS.emeraldStart, fontWeight: 600 }}>
+                {strings.collectionRoute.nearbyLabel} · {formatDistance(nearbySuggestion.distanceM)}
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                {nearbySuggestion.stop.name}
+              </Typography>
+              {nearbySuggestion.stop.neighborhood !== selectedBarrio && (
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+                  {nearbySuggestion.stop.neighborhood}
+                </Typography>
+              )}
+            </Box>
+            <Button size="small" variant="contained" onClick={goToNearby}>
+              {strings.collectionRoute.nearbyGo}
+            </Button>
+          </Box>
         )}
 
         {allDone ? (
