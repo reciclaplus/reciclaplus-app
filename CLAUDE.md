@@ -8,7 +8,7 @@ Waste & recycling collection management platform for the Dominican Republic. Ful
 - **Backend**: FastAPI (Python 3.12), SQLAlchemy 2.0 (direct Postgres connection to Supabase), Uvicorn/Gunicorn. Dependencies are managed with **uv** (`pyproject.toml` + `uv.lock`): use `uv sync`, `uv add <pkg>`, and `uv run <cmd>` — never pip directly.
 - **Migrations**: Supabase CLI migrations (SQL files in `supabase/migrations/`), applied with `supabase db push`. No Alembic. The SQL migration files are the source of truth for the schema; keep SQLAlchemy models in sync with them by hand.
 - **Database & Auth**: Supabase (PostgreSQL) with Google OAuth via Supabase Auth, cookie-based sessions (`@supabase/ssr`); the frontend sends a bearer token to FastAPI
-- **Hosting**: Google Cloud App Engine
+- **Hosting**: Frontend on Vercel, backend on FastAPI Cloud
 
 ## Repository Layout
 
@@ -92,7 +92,7 @@ Practical rules:
 | ----------- | -------------------------------- | --------------------------------- |
 | Development | `localhost:3000`                 | `localhost:8000`                  |
 | Testing     | Vercel preview (per git branch)  | FastAPI Cloud (shared test app)   |
-| Production  | `reciclaplus.com`                | `api.reciclaplus.com`             |
+| Production  | `reciclaplus.com`                | `api.reciclaplus.com` (FastAPI Cloud) |
 
 Each environment has its own Supabase project — development never touches production data. Per-environment config (Supabase URL/keys, OAuth credentials, CORS origins, cookie flags) lives in environment variables — never committed.
 
