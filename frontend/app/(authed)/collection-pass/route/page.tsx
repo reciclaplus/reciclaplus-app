@@ -268,23 +268,25 @@ function CollectionRoute() {
   // This is load-bearing, not an optimisation. `watchPosition` only reports
   // again once the device has actually moved, and the watch is subscribed
   // before the API responds. A stationary operator therefore gets exactly one
-  // fix, measured against an empty candidate list, and no later fix ever
-  // arrives to correct it — the suggestion could never appear at all. Asking
-  // for the position directly is cheap: `maximumAge` lets the cached fix answer
-  // immediately, without waiting on the GPS.
+  // fix, measured against an empty (or now-outdated) candidate list, and no
+  // later fix ever arrives to correct it — the suggestion could never appear,
+  // or update after a stop is marked, at all.
+  //
+  // Reusing `livePos` (rather than requesting a fresh `getCurrentPosition`
+  // fix here) is deliberate: a real device's GPS can be slow or unreliable to
+  // query again immediately while a `watchPosition` is already active, which
+  // otherwise left the suggestion stuck until the effects were torn down and
+  // resubscribed by navigating away and back. The operator hasn't moved
+  // meaningfully in the time it takes to mark a stop, so the last known fix
+  // is accurate enough to re-run the comparison against the new candidates.
+  //
+  // The update is deferred a microtask via `queueMicrotask` (effectively
+  // immediate) rather than calling `setNearby` straight from the effect body,
+  // per the project's `react-hooks/set-state-in-effect` lint rule.
   useEffect(() => {
-    if (pendingStops.length === 0 || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const at = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLivePos(at);
-        setGeoError(false);
-        setNearby((prev) => pickNearby(at, pendingStops, prev));
-      },
-      () => {}, // the watch above owns error reporting
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 },
-    );
-  }, [pendingStops]);
+    if (pendingStops.length === 0 || !livePos) return;
+    queueMicrotask(() => setNearby((prev) => pickNearby(livePos, pendingStops, prev)));
+  }, [pendingStops, livePos]);
 
   // Load data: try API first, fall back to IndexedDB cache if offline
   useEffect(() => {
