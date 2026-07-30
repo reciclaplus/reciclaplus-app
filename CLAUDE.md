@@ -92,7 +92,7 @@ Practical rules:
 | ----------- | -------------------------------- | --------------------------------- |
 | Development | `localhost:3000`                 | `localhost:8000`                  |
 | Testing     | Vercel preview (per git branch)  | FastAPI Cloud (shared test app)   |
-| Production  | `reciclaplus.com`                | `api.reciclaplus.com` (FastAPI Cloud) |
+| Production  | `app.reciclaplus.com`            | `api.app.reciclaplus.com` (FastAPI Cloud) |
 
 Each environment has its own Supabase project — development never touches production data. Per-environment config (Supabase URL/keys, OAuth credentials, CORS origins, cookie flags) lives in environment variables — never committed.
 
