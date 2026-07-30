@@ -172,11 +172,16 @@ function RouteMarkers({
   return null;
 }
 
-function MapController({ center }: { center: { lat: number; lng: number } | null }) {
+function MapController({ stop }: { stop: { pdr_id: string; lat: number; lng: number } | null }) {
   const map = useMap();
+  // Re-center only when the selected PDR actually changes (by id), not on every
+  // render — `stop` is a fresh object each time its owner re-renders (e.g. on
+  // every GPS fix), and depending on it directly would fight the operator's own
+  // panning/zooming by snapping back to the PDR mid-gesture.
   useEffect(() => {
-    if (map && center) map.panTo(center);
-  }, [map, center]);
+    if (map && stop) map.panTo({ lat: stop.lat, lng: stop.lng });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, stop?.pdr_id]);
   return null;
 }
 
@@ -532,7 +537,7 @@ function CollectionRoute() {
                 onSelect={setCurrentId}
                 livePos={livePos}
               />
-              <MapController center={currentStop ? { lat: currentStop.lat, lng: currentStop.lng } : null} />
+              <MapController stop={currentStop} />
               <MapRefCapture mapRef={mapRef} />
             </GoogleMap>
           </APIProvider>
