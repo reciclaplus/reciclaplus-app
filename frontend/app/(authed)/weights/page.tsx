@@ -139,57 +139,7 @@ function WeightsForm() {
           alignItems: "flex-start",
         }}
       >
-        <Paper sx={{ p: 3, width: { xs: "100%", md: 400 }, flexShrink: 0 }}>
-          <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={3}>
-              <TextField
-                type="date"
-                label={strings.weights.date}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                fullWidth
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
-
-              <TextField
-                select
-                label={strings.weights.plasticType}
-                value={plasticType}
-                onChange={(e) => setPlasticType(e.target.value as PlasticType)}
-                required
-                fullWidth
-              >
-                {PLASTIC_TYPES.map((t) => (
-                  <MenuItem key={t} value={t}>
-                    {strings.weights.plasticTypes[t]}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              <TextField
-                type="number"
-                label={strings.weights.weightLbs}
-                value={weightLbs}
-                onChange={(e) => setWeightLbs(e.target.value)}
-                required
-                fullWidth
-                slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={!canSubmit}
-              >
-                {submitting ? strings.weights.submitting : strings.weights.submit}
-              </Button>
-            </Stack>
-          </Box>
-        </Paper>
-
-        <Box sx={{ flexGrow: 1, minWidth: 0, width: { xs: "100%", md: "auto" } }}>
+        <Box sx={{ flex: { xs: "1 1 auto", md: "2 1 0%" }, minWidth: 0, width: { xs: "100%", md: "auto" } }}>
           <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
             {strings.weights.history}
           </Typography>
@@ -224,6 +174,61 @@ function WeightsForm() {
             }}
           />
         )}
+        </Box>
+
+        <Box sx={{ flex: { xs: "1 1 auto", md: "1 1 0%" }, minWidth: { md: 320 }, maxWidth: { md: 400 }, width: { xs: "100%", md: "auto" } }}>
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
+            {strings.weights.newEntry}
+          </Typography>
+          <Paper sx={{ p: 3 }}>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={3}>
+                <TextField
+                  type="date"
+                  label={strings.weights.date}
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  fullWidth
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+
+                <TextField
+                  select
+                  label={strings.weights.plasticType}
+                  value={plasticType}
+                  onChange={(e) => setPlasticType(e.target.value as PlasticType)}
+                  required
+                  fullWidth
+                >
+                  {PLASTIC_TYPES.map((t) => (
+                    <MenuItem key={t} value={t}>
+                      {strings.weights.plasticTypes[t]}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  type="number"
+                  label={strings.weights.weightLbs}
+                  value={weightLbs}
+                  onChange={(e) => setWeightLbs(e.target.value)}
+                  required
+                  fullWidth
+                  slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={!canSubmit}
+                >
+                  {submitting ? strings.weights.submitting : strings.weights.submit}
+                </Button>
+              </Stack>
+            </Box>
+          </Paper>
         </Box>
       </Box>
 
