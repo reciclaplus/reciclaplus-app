@@ -211,11 +211,7 @@ function CollectionRoute() {
   const [pendingCount, setPendingCount] = useState(0);
 
   const [selectedBarrio, setSelectedBarrio] = useState("");
-  // Explicit selection made by the operator (tap, nearby suggestion, prev/next).
-  // `currentId` below falls back to the barrio's first pending stop whenever
-  // this doesn't point at a stop in view, so switching barrios doesn't need an
-  // effect just to pick a default.
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [currentId, setCurrentId] = useState<string | null>(null);
 
   const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState(false);
@@ -372,13 +368,19 @@ function CollectionRoute() {
   const markedCount = stops.filter((s) => s.status !== null).length;
   const collectedCount = stops.filter((s) => s.status === "collected").length;
 
-  // Falls back to the barrio's first pending stop when there's no explicit
-  // selection in view (e.g. right after switching barrios).
-  const currentId = useMemo(() => {
-    if (selectedId && stops.some((s) => s.pdr_id === selectedId)) return selectedId;
+  // Auto-select first pending stop when barrio changes. A stop explicitly
+  // requested via the nearby banner wins, since selecting it may itself be what
+  // switched the barrio and recomputed `stops`.
+  const desiredIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (desiredIdRef.current && stops.some((s) => s.pdr_id === desiredIdRef.current)) {
+      setCurrentId(desiredIdRef.current);
+      desiredIdRef.current = null;
+      return;
+    }
     const firstPending = stops.find((s) => s.status === null);
-    return firstPending?.pdr_id ?? stops[stops.length - 1]?.pdr_id ?? null;
-  }, [stops, selectedId]);
+    setCurrentId(firstPending?.pdr_id ?? stops[stops.length - 1]?.pdr_id ?? null);
+  }, [stops]);
 
   const currentStop = stops.find((s) => s.pdr_id === currentId) ?? null;
   const currentIdx = stops.findIndex((s) => s.pdr_id === currentId);
@@ -396,7 +398,14 @@ function CollectionRoute() {
 
   function goToNearby() {
     if (!nearbySuggestion) return;
-    setSelectedId(nearbySuggestion.stop.pdr_id);
+    const { stop } = nearbySuggestion;
+    if (stop.neighborhood !== selectedBarrio) {
+      // Switching barrio recomputes `stops`, which would otherwise make the
+      // auto-select effect override this pick with the barrio's first pending.
+      desiredIdRef.current = stop.pdr_id;
+      setSelectedBarrio(stop.neighborhood);
+    }
+    setCurrentId(stop.pdr_id);
   }
 
   // Mark a stop — persist to IndexedDB outbox immediately
@@ -410,7 +419,7 @@ function CollectionRoute() {
     // Auto-advance to next pending
     const stopsAfter = stops.slice(currentIdx + 1);
     const next = stopsAfter.find((s) => s.pdr_id !== pdr_id && statuses[s.pdr_id] === null);
-    if (next) setSelectedId(next.pdr_id);
+    if (next) setCurrentId(next.pdr_id);
   }
 
   // Sync: flush IndexedDB outbox to server
@@ -529,7 +538,7 @@ function CollectionRoute() {
               <RouteMarkers
                 stops={stops}
                 currentId={currentId}
-                onSelect={setSelectedId}
+                onSelect={setCurrentId}
                 livePos={livePos}
               />
               <MapController stop={currentStop} />
@@ -717,7 +726,7 @@ function CollectionRoute() {
               {stops.map((stop, i) => (
                 <Box
                   key={stop.pdr_id}
-                  onClick={() => setSelectedId(stop.pdr_id)}
+                  onClick={() => setCurrentId(stop.pdr_id)}
                   sx={{
                     display: "flex",
                     alignItems: "center",
