@@ -231,6 +231,7 @@ export const strings = {
     loadError: "No se pudieron cargar los registros.",
     empty: "Aún no hay registros de peso.",
     history: "Historial de pesos",
+    newEntry: "Registrar nuevo peso",
     plasticTypes: {
       pet: "PET",
       hdpe: "HDPE",

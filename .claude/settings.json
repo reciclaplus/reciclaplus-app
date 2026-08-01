@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "fastapicloud-skills": {
+      "source": {
+        "source": "github",
+        "repo": "fastapicloud/skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "fastapicloud@fastapicloud-skills": true
+  }
+}
