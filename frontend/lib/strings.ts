@@ -9,7 +9,7 @@ export const strings = {
   landing: {
     tagline: "Gestión de recogida y reciclaje para la República Dominicana",
     description:
-      "Administra puntos de recogida, registra las pasadas semanales y visualiza el impacto del reciclaje.",
+      "Administra puntos de recogida, registra las recogidas semanales y visualiza el impacto del reciclaje.",
     signInWithGoogle: "Iniciar sesión con Google",
     // Dev-only email/password login (test environment only — never production).
     devLogin: {
@@ -29,7 +29,7 @@ export const strings = {
     error: "No se pudo cargar tu información.",
     quickLinks: "Accesos rápidos",
     routePass: "Recogida en vivo",
-    routePassDesc: "Iniciar una pasada de recogida guiada por el mapa",
+    routePassDesc: "Iniciar una recogida guiada por el mapa",
     dashboard: "Estadísticas",
     dashboardDesc: "Ver estadísticas y métricas",
     listDesc: "Buscar y editar puntos de recogida",
@@ -151,11 +151,11 @@ export const strings = {
     week: "Semana",
     of: "de",
     statusLabel: "Estado",
-    save: "Guardar pasada",
+    save: "Guardar recogida",
     saving: "Guardando...",
-    success: "Pasada guardada correctamente.",
-    error: "No se pudo guardar la pasada.",
-    loadError: "No se pudo cargar la pasada.",
+    success: "Recogida guardada correctamente.",
+    error: "No se pudo guardar la recogida.",
+    loadError: "No se pudo cargar la recogida.",
     empty: "No hay puntos de recogida para registrar.",
     notSet: "Sin registrar",
     filterCommunity: "Comunidad",
@@ -258,7 +258,7 @@ export const strings = {
     markEmpty: "Vacío",
     markUnavailable: "No disp.",
     markClosed: "Cerrado",
-    allComplete: "¡Pasada completada!",
+    allComplete: "¡Recogida completada!",
     noStops: "No hay puntos en este barrio.",
     loadError: "No se pudo cargar la ruta.",
   },
