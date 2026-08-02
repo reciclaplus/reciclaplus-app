@@ -72,6 +72,20 @@ function createClusterRenderer(color: string, barrioName: string): Renderer {
   };
 }
 
+function MapFocuser({ pdr }: { pdr: Pdr | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !pdr) return;
+    map.panTo({ lat: pdr.lat, lng: pdr.lng });
+    if ((map.getZoom() ?? 0) < 16) {
+      map.setZoom(16);
+    }
+  }, [map, pdr]);
+
+  return null;
+}
+
 function BarrioClusteredMarkers({
   pdrs,
   barrioColorMap,
@@ -131,12 +145,20 @@ export function PdrMap({
   center,
   pdrs,
   height = 540,
+  focusedPdr = null,
 }: {
   center: LatLng;
   pdrs: Pdr[];
   height?: number;
+  focusedPdr?: Pdr | null;
 }) {
   const [selected, setSelected] = useState<Pdr | null>(null);
+
+  useEffect(() => {
+    if (focusedPdr) {
+      setSelected(focusedPdr);
+    }
+  }, [focusedPdr]);
 
   const barrioColorMap = useMemo(
     () => buildBarrioColorMap(pdrs.map((p) => p.neighborhood)),
@@ -168,6 +190,7 @@ export function PdrMap({
               barrioColorMap={barrioColorMap}
               onSelect={setSelected}
             />
+            <MapFocuser pdr={focusedPdr} />
             {selected && (
               <InfoWindow
                 position={{ lat: selected.lat, lng: selected.lng }}
