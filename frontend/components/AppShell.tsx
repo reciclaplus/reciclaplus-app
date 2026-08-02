@@ -107,6 +107,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const secondaryItems = NAV_ITEMS_SECONDARY.filter((item) => hasRole(user?.role, item.minimum));
   const mobileTabs = MOBILE_TABS.filter((item) => hasRole(user?.role, item.minimum));
 
+  // The in-progress collection route is a full-screen, immersive view with its
+  // own back button and bottom controls — it must fill the exact viewport
+  // height itself, so it opts out of the shell's normal content padding and
+  // the mobile tab bar (which would otherwise overlap or crop its bottom
+  // controls, since padding meant to reserve space for the tab bar simply adds
+  // on top of the page's own 100dvh instead of being subtracted from it).
+  const isFullBleed = pathname === "/collection-pass/route";
+
   async function handleSignOut() {
     await createClient().auth.signOut();
     router.push("/");
@@ -207,14 +215,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           flexGrow: 1,
           width: "100%",
           minWidth: 0,
-          p: { xs: 2, sm: 3, md: 4 },
-          pb: { xs: 10, md: 4 },
+          ...(isFullBleed
+            ? { height: "100dvh", overflow: "hidden" }
+            : { p: { xs: 2, sm: 3, md: 4 }, pb: { xs: 10, md: 4 } }),
         }}
       >
         {children}
       </Box>
 
-      {!isDesktop && (
+      {!isDesktop && !isFullBleed && (
         <Box
           component="nav"
           sx={{
