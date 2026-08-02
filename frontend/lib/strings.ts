@@ -141,6 +141,7 @@ export const strings = {
   },
   mapPage: {
     title: "Mapa de puntos",
+    searchByName: "Buscar por nombre",
     filterNeighborhood: "Barrio",
     filterCategory: "Categoría",
     all: "Todos",

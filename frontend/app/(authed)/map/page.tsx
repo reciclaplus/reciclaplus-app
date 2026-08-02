@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
+import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import MenuItem from "@mui/material/MenuItem";
@@ -30,6 +31,7 @@ function MapView() {
   const [error, setError] = useState(false);
   const [neighborhood, setNeighborhood] = useState(ALL);
   const [category, setCategory] = useState(ALL);
+  const [focusedPdr, setFocusedPdr] = useState<Pdr | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -73,6 +75,12 @@ function MapView() {
     [pdrs, neighborhood, category],
   );
 
+  useEffect(() => {
+    if (focusedPdr && !filtered.some((p) => p.id === focusedPdr.id)) {
+      setFocusedPdr(null);
+    }
+  }, [filtered, focusedPdr]);
+
   if (error) {
     return <Alert severity="error">{strings.mapPage.loadError}</Alert>;
   }
@@ -92,6 +100,18 @@ function MapView() {
       </Typography>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+        <Autocomplete
+          size="small"
+          options={filtered}
+          value={focusedPdr}
+          getOptionLabel={(p) => p.name}
+          isOptionEqualToValue={(a, b) => a.id === b.id}
+          onChange={(_, value) => setFocusedPdr(value)}
+          renderInput={(params) => (
+            <TextField {...params} label={strings.mapPage.searchByName} />
+          )}
+          sx={{ minWidth: 240 }}
+        />
         <TextField
           select
           size="small"
@@ -124,7 +144,7 @@ function MapView() {
         </TextField>
       </Stack>
 
-      <PdrMap center={center} pdrs={filtered} />
+      <PdrMap center={center} pdrs={filtered} focusedPdr={focusedPdr} />
     </Stack>
   );
 }
