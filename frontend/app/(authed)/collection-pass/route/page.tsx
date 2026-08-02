@@ -481,7 +481,7 @@ function CollectionRoute() {
   if (loading || !week) return <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box>;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh", mx: { xs: -3, sm: 0 }, mt: { xs: -3, sm: 0 } }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Route header — visually distinct from the main app bar */}
       <Box sx={{
         display: "flex",
