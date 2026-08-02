@@ -23,6 +23,7 @@ import { apiFetch } from "@/lib/api";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import type { Pdr } from "@/lib/types";
+import { formatMondayDate } from "@/lib/week";
 
 const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
 
@@ -385,6 +386,13 @@ function Dashboard() {
                 data: chartWeeks.map((w) => weekLabel(w.year, w.week)),
                 scaleType: "band",
                 label: strings.dashboard.weekLabel,
+                valueFormatter: (value, context) => {
+                  if (context.location === "tooltip") {
+                    const week = chartWeeks.find((w) => weekLabel(w.year, w.week) === value);
+                    return week ? formatMondayDate(week) : value;
+                  }
+                  return value;
+                },
               }]}
               series={[{
                 data: chartWeeks.map((w) => w.collected),

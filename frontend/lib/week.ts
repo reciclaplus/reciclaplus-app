@@ -20,6 +20,13 @@ export function shiftWeek(w: IsoWeek, delta: number): IsoWeek {
   return { year: thu.getUTCFullYear(), week: isoWeek };
 }
 
+export function formatMondayDate(w: IsoWeek): string {
+  const mon = mondayOfWeek(w);
+  const dd = String(mon.getUTCDate()).padStart(2, "0");
+  const mm = String(mon.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${mon.getUTCFullYear()}`;
+}
+
 export function formatWeekLabel(w: IsoWeek): string {
   const mon = mondayOfWeek(w);
   return `Semana del ${mon.toLocaleDateString("es-DO", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}`;

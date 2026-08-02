@@ -29,17 +29,10 @@ import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import { ALERT_PILL_COLORS, STATUS_PILL_COLORS } from "@/lib/collection-status";
 import { buildBarrioColorMap, getBarrioColor } from "@/lib/barrio-colors";
-import { mondayOfWeek } from "@/lib/week";
+import { formatMondayDate } from "@/lib/week";
 import type { PdrWithHistory, TownDetail, WeekStatus } from "@/lib/types";
 
 const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
-
-function formatMondayDate(w: WeekStatus): string {
-  const mon = mondayOfWeek(w);
-  const dd = String(mon.getUTCDate()).padStart(2, "0");
-  const mm = String(mon.getUTCMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${mon.getUTCFullYear()}`;
-}
 
 function StatusPill({ status }: { status: keyof typeof strings.collectionPass.statuses }) {
   const colors = STATUS_PILL_COLORS[status];
