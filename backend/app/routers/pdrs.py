@@ -2,6 +2,7 @@
 
 import uuid
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, select
@@ -23,8 +24,10 @@ def list_pdrs(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("read")),
 ) -> list[Pdr]:
-    """List all pickup points."""
-    return db.execute(select(Pdr).order_by(Pdr.created_at.desc())).scalars().all()
+    """List all pickup points (excludes soft-deleted ones)."""
+    return db.execute(
+        select(Pdr).where(Pdr.deleted_at.is_(None)).order_by(Pdr.created_at.desc())
+    ).scalars().all()
 
 
 @router.get("/with-history", response_model=list[PdrWithHistory])
@@ -45,7 +48,9 @@ def list_pdrs_with_history(
             w += last_week
         weeks.append((y, w))
 
-    pdrs = db.execute(select(Pdr).order_by(Pdr.created_at.desc())).scalars().all()
+    pdrs = db.execute(
+        select(Pdr).where(Pdr.deleted_at.is_(None)).order_by(Pdr.created_at.desc())
+    ).scalars().all()
 
     conditions = [
         and_(Collection.year == y, Collection.week == w)
@@ -90,7 +95,7 @@ def get_pdr(
 ) -> Pdr:
     """Get a single pickup point."""
     pdr = db.get(Pdr, pdr_id)
-    if pdr is None:
+    if pdr is None or pdr.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
     return pdr
 
@@ -117,7 +122,7 @@ def update_pdr(
     _: User = Depends(require_role("write")),
 ) -> Pdr:
     pdr = db.get(Pdr, pdr_id)
-    if pdr is None:
+    if pdr is None or pdr.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(pdr, field, value)
@@ -132,8 +137,10 @@ def delete_pdr(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("write")),
 ) -> None:
+    """Soft-delete a pickup point: hides it from all views but keeps its
+    collection history intact."""
     pdr = db.get(Pdr, pdr_id)
-    if pdr is None:
+    if pdr is None or pdr.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
-    db.delete(pdr)
+    pdr.deleted_at = datetime.now(timezone.utc)
     db.commit()
