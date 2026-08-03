@@ -58,6 +58,7 @@ def get_week(
                 Collection.week == week,
             ),
         )
+        .where(Pdr.deleted_at.is_(None))
         .order_by(Pdr.community, Pdr.name)
     ).all()
 

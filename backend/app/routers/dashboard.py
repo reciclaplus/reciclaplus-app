@@ -83,22 +83,27 @@ def get_stats(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("read")),
 ) -> DashboardStats:
-    total_pdrs = db.scalar(select(func.count()).select_from(Pdr)) or 0
+    total_pdrs = db.scalar(
+        select(func.count()).select_from(Pdr).where(Pdr.deleted_at.is_(None))
+    ) or 0
 
     by_neighborhood = db.execute(
         select(Pdr.neighborhood, func.count().label("count"))
+        .where(Pdr.deleted_at.is_(None))
         .group_by(Pdr.neighborhood)
         .order_by(func.count().desc())
     ).all()
 
     by_community = db.execute(
         select(Pdr.community, func.count().label("count"))
+        .where(Pdr.deleted_at.is_(None))
         .group_by(Pdr.community)
         .order_by(func.count().desc())
     ).all()
 
     by_category = db.execute(
         select(Pdr.category, func.count().label("count"))
+        .where(Pdr.deleted_at.is_(None))
         .group_by(Pdr.category)
         .order_by(func.count().desc())
     ).all()
