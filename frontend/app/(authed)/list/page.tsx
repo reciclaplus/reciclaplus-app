@@ -22,6 +22,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
+import { MapPicker, type LatLng } from "@/components/MapPicker";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { hasRole } from "@/lib/roles";
@@ -176,8 +177,20 @@ function PdrList() {
       category: pdr.category,
       community: pdr.community,
       neighborhood: pdr.neighborhood,
+      lat: pdr.lat,
+      lng: pdr.lng,
     });
   }
+
+  const editMapCenter = useMemo(() => {
+    const town = towns.find((t) => t.communities.some((c) => c.name === editDraft.community));
+    return town ?? towns[0] ?? null;
+  }, [towns, editDraft.community]);
+
+  const editLocation: LatLng | null =
+    editDraft.lat != null && editDraft.lng != null
+      ? { lat: editDraft.lat, lng: editDraft.lng }
+      : null;
 
   async function saveEdit() {
     if (!editTarget) return;
@@ -483,6 +496,24 @@ function PdrList() {
                 <MenuItem key={n} value={n}>{n}</MenuItem>
               ))}
             </TextField>
+            {editMapCenter && (
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: COLORS.body, mb: 0.5 }}>
+                  {strings.newPdr.location}
+                </Typography>
+                <MapPicker
+                  center={{ lat: editMapCenter.map_center_lat, lng: editMapCenter.map_center_lng }}
+                  value={editLocation}
+                  onChange={(point) => setEditDraft((d) => ({ ...d, lat: point.lat, lng: point.lng }))}
+                  height={240}
+                />
+                <Typography sx={{ fontSize: 12, color: COLORS.muted, mt: 0.5 }}>
+                  {editLocation
+                    ? `${strings.newPdr.selectedCoords}: ${editLocation.lat.toFixed(6)}, ${editLocation.lng.toFixed(6)}`
+                    : strings.newPdr.noLocation}
+                </Typography>
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>

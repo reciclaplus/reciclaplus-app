@@ -73,6 +73,8 @@ class PdrUpdate(BaseModel):
     community: str | None = None
     neighborhood: str | None = None
     category: str | None = None
+    lat: float | None = None
+    lng: float | None = None
 
 
 class PdrOut(BaseModel):
