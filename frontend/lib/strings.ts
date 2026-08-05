@@ -233,6 +233,10 @@ export const strings = {
     empty: "Aún no hay registros de peso.",
     history: "Historial de pesos",
     newEntry: "Registrar nuevo peso",
+    updateError: "No se pudo actualizar el registro.",
+    deleteConfirm: "¿Eliminar este registro de peso?",
+    deleteError: "No se pudo eliminar el registro.",
+    actions: "Acciones",
     plasticTypes: {
       pet: "PET",
       hdpe: "HDPE",

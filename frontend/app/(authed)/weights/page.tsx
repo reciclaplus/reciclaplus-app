@@ -5,13 +5,22 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogTitle from "@mui/material/DialogTitle";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import DeleteIcon from "@mui/icons-material/Delete";
+import {
+  DataGrid,
+  GridActionsCellItem,
+  type GridColDef,
+  type GridRowId,
+} from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
@@ -40,12 +49,15 @@ function formatDate(iso: string): string {
   });
 }
 
-function todayISO(): string {
-  const d = new Date();
+function todayISOFromDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function todayISO(): string {
+  return todayISOFromDate(new Date());
 }
 
 function WeightsForm() {
@@ -58,6 +70,7 @@ function WeightsForm() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<GridRowId | null>(null);
 
   const columns: GridColDef<WeightEntry>[] = useMemo(
     () => [
@@ -66,20 +79,39 @@ function WeightsForm() {
         headerName: strings.weights.date,
         width: 140,
         type: "date",
+        editable: true,
         valueGetter: (_value, row) => new Date(row.date),
+        valueSetter: (value: Date, row) => ({ ...row, date: todayISOFromDate(value) }),
         valueFormatter: (_value, row) => formatDate(row.date),
       },
       {
         field: "plastic_type",
         headerName: strings.weights.plasticType,
         width: 160,
-        valueGetter: (_value, row) => strings.weights.plasticTypes[row.plastic_type],
+        type: "singleSelect",
+        editable: true,
+        valueOptions: PLASTIC_TYPES.map((t) => ({ value: t, label: strings.weights.plasticTypes[t] })),
       },
       {
         field: "weight_lbs",
         headerName: strings.weights.weightLbs,
         width: 140,
         type: "number",
+        editable: true,
+      },
+      {
+        field: "actions",
+        type: "actions",
+        headerName: strings.weights.actions,
+        width: 80,
+        getActions: (params) => [
+          <GridActionsCellItem
+            key="delete"
+            icon={<DeleteIcon fontSize="small" />}
+            label={strings.common.delete}
+            onClick={() => setDeleteTarget(params.id)}
+          />,
+        ],
       },
     ],
     [],
@@ -93,6 +125,36 @@ function WeightsForm() {
       setLoadError(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function processRowUpdate(newRow: WeightEntry, oldRow: WeightEntry): Promise<WeightEntry> {
+    try {
+      const updated = await apiFetch<WeightEntry>(`/weights/${newRow.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          date: newRow.date,
+          plastic_type: newRow.plastic_type,
+          weight_lbs: Number(newRow.weight_lbs),
+        }),
+      });
+      setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+      return updated;
+    } catch {
+      setToast({ ok: false, msg: strings.weights.updateError });
+      return oldRow;
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await apiFetch(`/weights/${deleteTarget}`, { method: "DELETE" });
+      setEntries((prev) => prev.filter((e) => e.id !== deleteTarget));
+    } catch {
+      setToast({ ok: false, msg: strings.weights.deleteError });
+    } finally {
+      setDeleteTarget(null);
     }
   }
 
@@ -160,6 +222,8 @@ function WeightsForm() {
             showToolbar
             autoHeight
             disableRowSelectionOnClick
+            processRowUpdate={processRowUpdate}
+            onProcessRowUpdateError={() => setToast({ ok: false, msg: strings.weights.updateError })}
             pageSizeOptions={[10, 25, 50]}
             initialState={{
               pagination: { paginationModel: { pageSize: 10 } },
@@ -247,6 +311,16 @@ function WeightsForm() {
           </Alert>
         ) : undefined}
       </Snackbar>
+
+      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>{strings.weights.deleteConfirm}</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>{strings.common.cancel}</Button>
+          <Button color="error" variant="contained" onClick={confirmDelete}>
+            {strings.common.delete}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -198,6 +198,12 @@ class WeightEntryCreate(BaseModel):
     weight_lbs: float = Field(gt=0)
 
 
+class WeightEntryUpdate(BaseModel):
+    date: str | None = Field(default=None, description="ISO date string (YYYY-MM-DD)")
+    plastic_type: PlasticType | None = None
+    weight_lbs: float | None = Field(default=None, gt=0)
+
+
 class WeightEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
