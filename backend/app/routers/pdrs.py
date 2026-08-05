@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
+from app.activity_log import log_activity
 from app.auth import require_role
 from app.db import get_db
 from app.isoweek import current_iso_week
@@ -109,6 +110,15 @@ def create_pdr(
     """Create a new pickup point."""
     pdr = Pdr(**payload.model_dump(), created_by=user.id)
     db.add(pdr)
+    db.flush()
+    log_activity(
+        db,
+        user_id=user.id,
+        action="create",
+        resource_type="pdr",
+        resource_id=pdr.id,
+        resource_name=pdr.name,
+    )
     db.commit()
     db.refresh(pdr)
     return pdr
@@ -119,13 +129,21 @@ def update_pdr(
     pdr_id: uuid.UUID,
     payload: PdrUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role("write")),
+    user: User = Depends(require_role("write")),
 ) -> Pdr:
     pdr = db.get(Pdr, pdr_id)
     if pdr is None or pdr.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(pdr, field, value)
+    log_activity(
+        db,
+        user_id=user.id,
+        action="update",
+        resource_type="pdr",
+        resource_id=pdr.id,
+        resource_name=pdr.name,
+    )
     db.commit()
     db.refresh(pdr)
     return pdr
@@ -135,7 +153,7 @@ def update_pdr(
 def delete_pdr(
     pdr_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role("write")),
+    user: User = Depends(require_role("write")),
 ) -> None:
     """Soft-delete a pickup point: hides it from all views but keeps its
     collection history intact."""
@@ -143,4 +161,12 @@ def delete_pdr(
     if pdr is None or pdr.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
     pdr.deleted_at = datetime.now(timezone.utc)
+    log_activity(
+        db,
+        user_id=user.id,
+        action="delete",
+        resource_type="pdr",
+        resource_id=pdr.id,
+        resource_name=pdr.name,
+    )
     db.commit()

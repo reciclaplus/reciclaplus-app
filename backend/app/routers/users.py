@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.activity_log import log_activity
 from app.auth import require_role
 from app.db import get_db
 from app.models.user import User
@@ -56,6 +57,15 @@ def create_user(
         email=email, name=payload.name, role=payload.role, created_by=admin.id
     )
     db.add(user)
+    db.flush()
+    log_activity(
+        db,
+        user_id=admin.id,
+        action="create",
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.email,
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -66,12 +76,20 @@ def update_user(
     email: str,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    admin: User = Depends(require_role("admin")),
 ) -> User:
     """Update a user's role and/or name."""
     user = _find_user_by_email(db, email)
     user.role = payload.role
     user.name = payload.name
+    log_activity(
+        db,
+        user_id=admin.id,
+        action="update",
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.email,
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -90,5 +108,13 @@ def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot delete your own account",
         )
+    log_activity(
+        db,
+        user_id=admin.id,
+        action="delete",
+        resource_type="user",
+        resource_id=user.id,
+        resource_name=user.email,
+    )
     db.delete(user)
     db.commit()
