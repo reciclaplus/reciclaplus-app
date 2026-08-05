@@ -1,7 +1,7 @@
 """Dashboard statistics endpoint."""
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -17,9 +17,9 @@ from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-WeekRange = Literal["3m", "6m", "1y", "all"]
+WeekRange = Literal["1w", "1m", "3m", "6m", "1y", "all"]
 
-_RANGE_MONTHS: dict[str, int] = {"3m": 3, "6m": 6, "1y": 12}
+_RANGE_MONTHS: dict[str, int] = {"1m": 1, "3m": 3, "6m": 6, "1y": 12}
 
 
 def _months_ago(d: date, months: int) -> date:
@@ -32,6 +32,8 @@ def _months_ago(d: date, months: int) -> date:
 
 
 def _range_cutoff(week_range: WeekRange) -> date | None:
+    if week_range == "1w":
+        return date.today() - timedelta(weeks=1)
     months = _RANGE_MONTHS.get(week_range)
     return _months_ago(date.today(), months) if months else None
 

@@ -89,7 +89,7 @@ const NEIGHBORHOOD_COLORS = [
   "#7a9c4f", // olive
 ];
 
-type WeekRange = "all" | "3m" | "6m" | "1y";
+type WeekRange = "all" | "1w" | "1m" | "3m" | "6m" | "1y";
 
 type AddedWithin = 7 | 30 | 90;
 
@@ -380,6 +380,8 @@ function Dashboard() {
                 onChange={(e: SelectChangeEvent) => setRangeFilter(e.target.value as WeekRange)}
               >
                 <MenuItem value="all">{strings.dashboard.all}</MenuItem>
+                <MenuItem value="1w">{strings.dashboard.range1w}</MenuItem>
+                <MenuItem value="1m">{strings.dashboard.range1m}</MenuItem>
                 <MenuItem value="3m">{strings.dashboard.range3m}</MenuItem>
                 <MenuItem value="6m">{strings.dashboard.range6m}</MenuItem>
                 <MenuItem value="1y">{strings.dashboard.range1y}</MenuItem>
