@@ -66,12 +66,20 @@ class StatusBreakdown(BaseModel):
     count: int
 
 
+class WeekNeighborhoodCollections(BaseModel):
+    year: int
+    week: int
+    neighborhood: str
+    collected: int
+
+
 class DashboardStats(BaseModel):
     total_pdrs: int
     pdrs_by_neighborhood: list[NeighborhoodCount]
     pdrs_by_community: list[CommunityCount]
     pdrs_by_category: list[CategoryCount]
     collections_by_week: list[WeekCollections]
+    collections_by_week_by_neighborhood: list[WeekNeighborhoodCollections]
     current_status_breakdown: list[StatusBreakdown]
 
 
@@ -131,6 +139,25 @@ def get_stats(
     )
     week_rows = db.execute(week_query).all()
 
+    week_neighborhood_query = (
+        select(
+            Collection.year,
+            Collection.week,
+            Pdr.neighborhood,
+            func.count().filter(Collection.status == "collected").label("collected"),
+        )
+        .join(Pdr, Pdr.id == Collection.pdr_id)
+        .group_by(Collection.year, Collection.week, Pdr.neighborhood)
+        .order_by(Collection.year, Collection.week)
+    )
+    if neighborhood:
+        week_neighborhood_query = week_neighborhood_query.where(Pdr.neighborhood == neighborhood)
+    if category:
+        week_neighborhood_query = week_neighborhood_query.where(Pdr.category == category)
+    if cutoff:
+        week_neighborhood_query = week_neighborhood_query.where(Collection.date >= cutoff)
+    week_neighborhood_rows = db.execute(week_neighborhood_query).all()
+
     latest = db.execute(
         select(Collection.year, Collection.week)
         .order_by(Collection.year.desc(), Collection.week.desc())
@@ -154,6 +181,10 @@ def get_stats(
         collections_by_week=[
             WeekCollections(year=r.year, week=r.week, collected=r.collected, empty=r.empty, unavailable=r.unavailable, closed=r.closed, total=r.total)
             for r in week_rows
+        ],
+        collections_by_week_by_neighborhood=[
+            WeekNeighborhoodCollections(year=r.year, week=r.week, neighborhood=r.neighborhood, collected=r.collected)
+            for r in week_neighborhood_rows
         ],
         current_status_breakdown=status_breakdown,
     )
