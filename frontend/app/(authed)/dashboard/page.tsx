@@ -58,6 +58,12 @@ interface StatusBreakdown {
   status: string;
   count: number;
 }
+interface MonthWeight {
+  year: number;
+  month: number;
+  plastic_type: string;
+  weight_lbs: number;
+}
 interface DashboardStats {
   total_pdrs: number;
   pdrs_by_neighborhood: NeighborhoodCount[];
@@ -66,6 +72,7 @@ interface DashboardStats {
   collections_by_week: WeekCollections[];
   collections_by_week_by_neighborhood: WeekNeighborhoodCollections[];
   current_status_breakdown: StatusBreakdown[];
+  weight_by_month: MonthWeight[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -76,6 +83,13 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
+
+const PLASTIC_TYPE_COLORS: Record<string, string> = {
+  pet: "#12633f",
+  hdpe: "#f5951f",
+  pp: "#3c6e8f",
+  trash: "#8a3324",
+};
 
 const NEIGHBORHOOD_COLORS = [
   "#0d4e31", // forest green
@@ -136,6 +150,12 @@ const latestPdrColumns: GridColDef<Pdr>[] = [
 
 function weekLabel(year: number, week: number): string {
   return `S${week}'${String(year).slice(-2)}`;
+}
+
+const MONTH_ABBR = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function monthLabel(year: number, month: number): string {
+  return `${MONTH_ABBR[month - 1]}'${String(year).slice(-2)}`;
 }
 
 function buildChartQuery(range: WeekRange, neighborhood: string, category: string): string {
@@ -263,6 +283,30 @@ function Dashboard() {
       }),
     }));
   }, [chartWeeks, chartWeekNeighborhoods]);
+
+  const monthKeys = useMemo(() => {
+    const keys = Array.from(new Set(stats?.weight_by_month.map((m) => `${m.year}-${m.month}`) ?? []));
+    return keys.sort((a, b) => {
+      const [ay, am] = a.split("-").map(Number);
+      const [by, bm] = b.split("-").map(Number);
+      return ay - by || am - bm;
+    });
+  }, [stats]);
+
+  const weightByTypeSeries = useMemo(() => {
+    if (!stats) return [];
+    const types = Array.from(new Set(stats.weight_by_month.map((m) => m.plastic_type)));
+    return types.map((plastic_type) => ({
+      plastic_type,
+      color: PLASTIC_TYPE_COLORS[plastic_type] ?? "#999",
+      data: monthKeys.map((key) => {
+        const match = stats.weight_by_month.find(
+          (m) => m.plastic_type === plastic_type && `${m.year}-${m.month}` === key
+        );
+        return match?.weight_lbs ?? 0;
+      }),
+    }));
+  }, [stats, monthKeys]);
 
   if (error) return <Alert severity="error">{strings.dashboard.loadError}</Alert>;
   if (loading || !stats) {
@@ -442,6 +486,38 @@ function Dashboard() {
               series={neighborhoodSeries.map((s) => ({
                 data: s.data,
                 label: s.neighborhood,
+                stack: "total",
+                color: s.color,
+              }))}
+              borderRadius={6}
+            />
+          ) : (
+            <Typography sx={{ color: COLORS.muted, fontSize: 13.5 }}>—</Typography>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Monthly weight chart */}
+      <Card>
+        <CardContent>
+          <Typography sx={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink, mb: 2 }}>
+            {strings.dashboard.weightByMonth}
+          </Typography>
+          {monthKeys.length > 0 ? (
+            <BarChart
+              height={300}
+              xAxis={[{
+                data: monthKeys.map((key) => {
+                  const [y, m] = key.split("-").map(Number);
+                  return monthLabel(y, m);
+                }),
+                scaleType: "band",
+                label: strings.dashboard.monthLabel,
+              }]}
+              yAxis={[{ label: strings.dashboard.weightLbs }]}
+              series={weightByTypeSeries.map((s) => ({
+                data: s.data,
+                label: strings.weights.plasticTypes[s.plastic_type as keyof typeof strings.weights.plasticTypes] ?? s.plastic_type,
                 stack: "total",
                 color: s.color,
               }))}

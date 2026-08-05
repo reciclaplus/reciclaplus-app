@@ -221,6 +221,9 @@ export const strings = {
     last30Days: "Últimos 30 días",
     last90Days: "Últimos 90 días",
     latestPdrsEmpty: "No se han añadido PDRs en este periodo.",
+    weightByMonth: "Peso recolectado por mes",
+    monthLabel: "Mes",
+    weightLbs: "Peso (libras)",
   },
   weights: {
     title: "Registro de peso",
