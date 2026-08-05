@@ -210,6 +210,8 @@ export const strings = {
     filterNeighborhood: "Barrio",
     filterCategory: "Categoría",
     all: "Todo",
+    range1w: "1 semana",
+    range1m: "1 mes",
     range3m: "3 meses",
     range6m: "6 meses",
     range1y: "1 año",
