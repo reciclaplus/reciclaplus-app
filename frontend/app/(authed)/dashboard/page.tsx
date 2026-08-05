@@ -48,6 +48,12 @@ interface WeekCollections {
   closed: number;
   total: number;
 }
+interface WeekNeighborhoodCollections {
+  year: number;
+  week: number;
+  neighborhood: string;
+  collected: number;
+}
 interface StatusBreakdown {
   status: string;
   count: number;
@@ -58,6 +64,7 @@ interface DashboardStats {
   pdrs_by_community: CommunityCount[];
   pdrs_by_category: CategoryCount[];
   collections_by_week: WeekCollections[];
+  collections_by_week_by_neighborhood: WeekNeighborhoodCollections[];
   current_status_breakdown: StatusBreakdown[];
 }
 
@@ -69,6 +76,18 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
+
+const NEIGHBORHOOD_COLORS = [
+  "#0d4e31", // forest green
+  "#f5951f", // amber accent
+  "#1f7a72", // teal
+  "#c1440e", // terracotta
+  "#5a9c77", // sage
+  "#b9740b", // deep gold
+  "#3c6e8f", // slate blue
+  "#8a3324", // rust
+  "#7a9c4f", // olive
+];
 
 type WeekRange = "all" | "3m" | "6m" | "1y";
 
@@ -187,6 +206,7 @@ function Dashboard() {
   const [error, setError] = useState(false);
 
   const [chartWeeks, setChartWeeks] = useState<WeekCollections[] | null>(null);
+  const [chartWeekNeighborhoods, setChartWeekNeighborhoods] = useState<WeekNeighborhoodCollections[] | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [rangeFilter, setRangeFilter] = useState<WeekRange>("1y");
   const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
@@ -216,10 +236,33 @@ function Dashboard() {
   useEffect(() => {
     setChartLoading(true);
     apiFetch<DashboardStats>(`/dashboard/stats${buildChartQuery(rangeFilter, neighborhoodFilter, categoryFilter)}`)
-      .then((data) => setChartWeeks(data.collections_by_week))
+      .then((data) => {
+        setChartWeeks(data.collections_by_week);
+        setChartWeekNeighborhoods(data.collections_by_week_by_neighborhood);
+      })
       .catch(() => setError(true))
       .finally(() => setChartLoading(false));
   }, [rangeFilter, neighborhoodFilter, categoryFilter]);
+
+  const neighborhoodSeries = useMemo(() => {
+    if (!chartWeeks || !chartWeekNeighborhoods) return [];
+    const weekKeys = chartWeeks.map((w) => `${w.year}-${w.week}`);
+    const neighborhoods = Array.from(new Set(chartWeekNeighborhoods.map((n) => n.neighborhood))).sort((a, b) => {
+      const totalA = chartWeekNeighborhoods.filter((n) => n.neighborhood === a).reduce((s, n) => s + n.collected, 0);
+      const totalB = chartWeekNeighborhoods.filter((n) => n.neighborhood === b).reduce((s, n) => s + n.collected, 0);
+      return totalB - totalA;
+    });
+    return neighborhoods.map((neighborhood, i) => ({
+      neighborhood,
+      color: NEIGHBORHOOD_COLORS[i % NEIGHBORHOOD_COLORS.length],
+      data: weekKeys.map((key) => {
+        const match = chartWeekNeighborhoods.find(
+          (n) => n.neighborhood === neighborhood && `${n.year}-${n.week}` === key
+        );
+        return match?.collected ?? 0;
+      }),
+    }));
+  }, [chartWeeks, chartWeekNeighborhoods]);
 
   if (error) return <Alert severity="error">{strings.dashboard.loadError}</Alert>;
   if (loading || !stats) {
@@ -394,11 +437,12 @@ function Dashboard() {
                   return value;
                 },
               }]}
-              series={[{
-                data: chartWeeks.map((w) => w.collected),
-                label: strings.collectionPass.statuses.collected,
-                color: COLORS.status.collected.dot,
-              }]}
+              series={neighborhoodSeries.map((s) => ({
+                data: s.data,
+                label: s.neighborhood,
+                stack: "total",
+                color: s.color,
+              }))}
               borderRadius={6}
             />
           ) : (
