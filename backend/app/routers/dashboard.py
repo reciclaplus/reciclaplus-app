@@ -14,6 +14,7 @@ from app.db import get_db
 from app.models.collection import Collection
 from app.models.pdr import Pdr
 from app.models.user import User
+from app.models.weight_entry import WeightEntry
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -73,6 +74,13 @@ class WeekNeighborhoodCollections(BaseModel):
     collected: int
 
 
+class MonthWeight(BaseModel):
+    year: int
+    month: int
+    plastic_type: str
+    weight_lbs: float
+
+
 class DashboardStats(BaseModel):
     total_pdrs: int
     pdrs_by_neighborhood: list[NeighborhoodCount]
@@ -81,6 +89,7 @@ class DashboardStats(BaseModel):
     collections_by_week: list[WeekCollections]
     collections_by_week_by_neighborhood: list[WeekNeighborhoodCollections]
     current_status_breakdown: list[StatusBreakdown]
+    weight_by_month: list[MonthWeight]
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -158,6 +167,18 @@ def get_stats(
         week_neighborhood_query = week_neighborhood_query.where(Collection.date >= cutoff)
     week_neighborhood_rows = db.execute(week_neighborhood_query).all()
 
+    month_query = (
+        select(
+            func.extract("year", WeightEntry.date).label("year"),
+            func.extract("month", WeightEntry.date).label("month"),
+            WeightEntry.plastic_type,
+            func.sum(WeightEntry.weight_lbs).label("weight_lbs"),
+        )
+        .group_by("year", "month", WeightEntry.plastic_type)
+        .order_by("year", "month")
+    )
+    month_rows = db.execute(month_query).all()
+
     latest = db.execute(
         select(Collection.year, Collection.week)
         .order_by(Collection.year.desc(), Collection.week.desc())
@@ -187,4 +208,8 @@ def get_stats(
             for r in week_neighborhood_rows
         ],
         current_status_breakdown=status_breakdown,
+        weight_by_month=[
+            MonthWeight(year=int(r.year), month=int(r.month), plastic_type=r.plastic_type, weight_lbs=float(r.weight_lbs))
+            for r in month_rows
+        ],
     )
