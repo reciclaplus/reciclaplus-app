@@ -27,6 +27,10 @@ class ActivityLog(Base):
     resource_type: Mapped[str] = mapped_column(String, nullable=False)
     resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     resource_name: Mapped[str] = mapped_column(String, nullable=False)
+    # Snapshot of the acting user's email (not a live join), for the same
+    # reason as resource_name: stays readable after the actor is renamed or
+    # hard-deleted.
+    actor_email: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

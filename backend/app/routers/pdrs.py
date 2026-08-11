@@ -114,6 +114,7 @@ def create_pdr(
     log_activity(
         db,
         user_id=user.id,
+        actor_email=user.email,
         action="create",
         resource_type="pdr",
         resource_id=pdr.id,
@@ -139,6 +140,7 @@ def update_pdr(
     log_activity(
         db,
         user_id=user.id,
+        actor_email=user.email,
         action="update",
         resource_type="pdr",
         resource_id=pdr.id,
@@ -164,6 +166,7 @@ def delete_pdr(
     log_activity(
         db,
         user_id=user.id,
+        actor_email=user.email,
         action="delete",
         resource_type="pdr",
         resource_id=pdr.id,

@@ -61,6 +61,7 @@ def create_user(
     log_activity(
         db,
         user_id=admin.id,
+        actor_email=admin.email,
         action="create",
         resource_type="user",
         resource_id=user.id,
@@ -85,6 +86,7 @@ def update_user(
     log_activity(
         db,
         user_id=admin.id,
+        actor_email=admin.email,
         action="update",
         resource_type="user",
         resource_id=user.id,
@@ -111,6 +113,7 @@ def delete_user(
     log_activity(
         db,
         user_id=admin.id,
+        actor_email=admin.email,
         action="delete",
         resource_type="user",
         resource_id=user.id,
