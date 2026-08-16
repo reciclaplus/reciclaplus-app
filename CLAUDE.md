@@ -96,6 +96,14 @@ Practical rules:
 
 Each environment has its own Supabase project — development never touches production data. Per-environment config (Supabase URL/keys, OAuth credentials, CORS origins, cookie flags) lives in environment variables — never committed.
 
+### Production data is off-limits without explicit approval
+
+**Never run any command that reads from or writes to the production Supabase project (`reciclapp-prod` / `fapvtagwtbvdzbqjhvlc`) without the user's explicit, per-action approval in chat.** This includes schema changes, `supabase db reset`/`db push`/`migration` commands, direct SQL, and one-off scripts — approval for one action does not carry over to the next one.
+
+Before running **any** database command (CLI or direct connection), explicitly verify which project it targets — do not assume the linked/ambient project state is correct. This matters especially across worktrees and checkouts: `supabase link` state is local to each working directory (stored in `supabase/.temp/project-ref`, gitignored), so a command run from a different checkout than expected can silently hit a different project. Before a destructive or mutating command, print/confirm the resolved project ref or connection host and state it to the user.
+
+**If a command's target is production, say so out loud before running it** — e.g. "This will run against **PRODUCTION** (`reciclapp-prod`)." Do not soften or omit this warning even if the action seems routine.
+
 ### Testing environment
 
 For trying out changes without touching real data: a dedicated Supabase project (`reciclapp-test`) holds the same schema (kept in sync via the same `supabase/migrations/` files), a single persistent FastAPI Cloud deployment serves as the shared test backend, and Vercel gives every pushed git branch an automatic preview URL wired to that backend.
