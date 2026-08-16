@@ -49,7 +49,7 @@ export interface Pdr {
 export interface WeekStatus {
   year: number;
   week: number;
-  status: "collected" | "empty" | "unavailable" | "closed";
+  status: "collected" | "empty" | "unavailable" | "closed" | null;
 }
 
 export interface PdrWithHistory extends Pdr {
