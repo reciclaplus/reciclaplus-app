@@ -95,7 +95,7 @@ class PdrOut(BaseModel):
 class WeekStatus(BaseModel):
     year: int
     week: int
-    status: CollectionStatus
+    status: CollectionStatus | None = None
 
 
 class PdrWithHistory(PdrOut):

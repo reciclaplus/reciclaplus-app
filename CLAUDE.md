@@ -116,3 +116,9 @@ For trying out changes without touching real data: a dedicated Supabase project 
 ### Claude Code plugins
 
 [.claude/settings.json](.claude/settings.json) declares the [fastapicloud/skills](https://github.com/fastapicloud/skills) marketplace and enables its `fastapicloud` plugin, so Claude Code offers to install it the first time you trust this folder. It adds skills for deploying the backend to FastAPI Cloud and reading its logs and env vars (`/fastapicloud:fastapicloud-deploy`, `-logs`, `-env`); Claude also invokes them automatically when a task calls for it. Installation is per-user — accept the prompt (or run `/plugin install fastapicloud@fastapicloud-skills`) once per machine. The plugin drives `uv run fastapi cloud ...`, which the backend's existing `fastapi[standard]` dependency already provides — it just needs you logged in once via `uv run fastapi cloud auth login` from `backend/`.
+
+To deploy manually, run this from the **repo root** (not from `backend/`):
+
+```bash
+./backend/.venv/Scripts/fastapi.exe cloud deploy --app-id <app-id> .
+```

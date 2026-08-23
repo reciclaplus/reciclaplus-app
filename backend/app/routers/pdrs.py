@@ -1,7 +1,6 @@
 """Pickup point (PDR) endpoints."""
 
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,7 +35,13 @@ def list_pdrs_with_history(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("read")),
 ) -> list[PdrWithHistory]:
-    """All PDRs with their collection status for the last 5 ISO weeks."""
+    """All PDRs with their collection status for the last 5 ISO weeks.
+
+    Always returns exactly 5 entries per PDR (oldest to newest), one per week
+    in the window, with status=None for weeks that have no recorded
+    collection — so a gap week is distinguishable from "not yet reached in
+    the window" instead of silently shifting later weeks into its slot.
+    """
     year, week = current_iso_week()
     weeks: list[tuple[int, int]] = []
     for i in range(5):
@@ -48,6 +53,7 @@ def list_pdrs_with_history(
             last_week = date(y, 12, 28).isocalendar().week
             w += last_week
         weeks.append((y, w))
+    weeks.reverse()  # oldest to newest
 
     pdrs = db.execute(
         select(Pdr).where(Pdr.deleted_at.is_(None)).order_by(Pdr.created_at.desc())
@@ -63,12 +69,9 @@ def list_pdrs_with_history(
         .where(or_(*conditions))
     ).all()
 
-    history: dict[uuid.UUID, list[WeekStatus]] = defaultdict(list)
-    for c in collections:
-        history[c.pdr_id].append(WeekStatus(year=c.year, week=c.week, status=c.status))
-
-    for pdr_id in history:
-        history[pdr_id].sort(key=lambda ws: (ws.year, ws.week))
+    status_by_pdr_week: dict[tuple[uuid.UUID, int, int], str] = {
+        (c.pdr_id, c.year, c.week): c.status for c in collections
+    }
 
     return [
         PdrWithHistory(
@@ -82,7 +85,10 @@ def list_pdrs_with_history(
             lat=p.lat,
             lng=p.lng,
             created_at=p.created_at,
-            recent_collections=history.get(p.id, []),
+            recent_collections=[
+                WeekStatus(year=y, week=w, status=status_by_pdr_week.get((p.id, y, w)))
+                for y, w in weeks
+            ],
         )
         for p in pdrs
     ]

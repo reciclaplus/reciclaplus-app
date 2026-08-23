@@ -67,16 +67,17 @@ function AlertPill() {
 }
 
 function HistoryStrip({ history }: { history: WeekStatus[] }) {
-  const slots = Array.from({ length: 5 }, (_, i) => history[history.length - 5 + i]);
   return (
     <Stack direction="row" spacing={0.75}>
-      {slots.map((ws, i) =>
-        ws ? (
+      {history.map((ws, i) =>
+        ws.status ? (
           <Tooltip key={i} title={`S${ws.week}/${ws.year} · ${strings.collectionPass.statuses[ws.status]}`}>
             <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: COLORS.status[ws.status].dot }} />
           </Tooltip>
         ) : (
-          <Box key={i} sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: COLORS.hairlineAlt }} />
+          <Tooltip key={i} title={`S${ws.week}/${ws.year} · ${strings.list.noHistory}`}>
+            <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: COLORS.hairlineAlt }} />
+          </Tooltip>
         ),
       )}
     </Stack>
@@ -93,6 +94,13 @@ interface PdrRow extends PdrWithHistory {
 
 function hasNoCollectionAlert(p: PdrWithHistory): boolean {
   return !p.recent_collections.some((ws) => ws.status === "collected");
+}
+
+function lastRecordedWeek(history: WeekStatus[]): WeekStatus | undefined {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].status) return history[i];
+  }
+  return undefined;
 }
 
 function PdrList() {
@@ -148,7 +156,7 @@ function PdrList() {
   const rows: PdrRow[] = useMemo(
     () =>
       filtered.map((p) => {
-        const lastWeek = p.recent_collections[p.recent_collections.length - 1];
+        const lastWeek = lastRecordedWeek(p.recent_collections);
         return {
           ...p,
           barrioColor: getBarrioColor(barrioColorMap, p.neighborhood),

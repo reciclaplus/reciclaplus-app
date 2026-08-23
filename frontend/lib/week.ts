@@ -27,6 +27,15 @@ export function formatMondayDate(w: IsoWeek): string {
   return `${dd}/${mm}/${mon.getUTCFullYear()}`;
 }
 
+export function isoWeekOf(d: Date): IsoWeek {
+  const thu = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dow = thu.getUTCDay() || 7;
+  thu.setUTCDate(thu.getUTCDate() - dow + 4);
+  const yearStart = new Date(Date.UTC(thu.getUTCFullYear(), 0, 1));
+  const isoWeek = Math.ceil(((thu.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: thu.getUTCFullYear(), week: isoWeek };
+}
+
 export function formatWeekLabel(w: IsoWeek): string {
   const mon = mondayOfWeek(w);
   return `Semana del ${mon.toLocaleDateString("es-DO", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}`;

@@ -23,7 +23,7 @@ import { apiFetch } from "@/lib/api";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import type { Pdr } from "@/lib/types";
-import { formatMondayDate } from "@/lib/week";
+import { formatMondayDate, isoWeekOf, shiftWeek, type IsoWeek } from "@/lib/week";
 
 const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
 
@@ -158,6 +158,28 @@ function monthLabel(year: number, month: number): string {
   return `${MONTH_ABBR[month - 1]}'${String(year).slice(-2)}`;
 }
 
+const RANGE_MONTHS: Partial<Record<WeekRange, number>> = { "1m": 1, "3m": 3, "6m": 6, "1y": 12 };
+
+function monthsAgo(d: Date, months: number): Date {
+  const total = d.getUTCMonth() - months;
+  const year = d.getUTCFullYear() + Math.floor(total / 12);
+  const month = ((total % 12) + 12) % 12;
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(d.getUTCDate(), daysInMonth);
+  return new Date(Date.UTC(year, month, day));
+}
+
+function rangeStartDate(range: WeekRange): Date | null {
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  if (range === "1w") {
+    todayUtc.setUTCDate(todayUtc.getUTCDate() - 7);
+    return todayUtc;
+  }
+  const months = RANGE_MONTHS[range];
+  return months ? monthsAgo(todayUtc, months) : null;
+}
+
 function buildChartQuery(range: WeekRange, neighborhood: string, category: string): string {
   const params = new URLSearchParams();
   if (range !== "all") params.set("range", range);
@@ -264,9 +286,31 @@ function Dashboard() {
       .finally(() => setChartLoading(false));
   }, [rangeFilter, neighborhoodFilter, categoryFilter]);
 
+  const filledChartWeeks = useMemo(() => {
+    if (!chartWeeks) return null;
+    const byKey = new Map(chartWeeks.map((w) => [`${w.year}-${w.week}`, w]));
+    const startDate = rangeStartDate(rangeFilter);
+    const startWeek: IsoWeek | null = startDate
+      ? isoWeekOf(startDate)
+      : chartWeeks.length > 0
+        ? { year: chartWeeks[0].year, week: chartWeeks[0].week }
+        : null;
+    if (!startWeek) return chartWeeks;
+    const endWeek = isoWeekOf(new Date());
+    const weeks: WeekCollections[] = [];
+    let cursor = startWeek;
+    for (let i = 0; i < 600; i++) {
+      const key = `${cursor.year}-${cursor.week}`;
+      weeks.push(byKey.get(key) ?? { year: cursor.year, week: cursor.week, collected: 0, empty: 0, unavailable: 0, closed: 0, total: 0 });
+      if (cursor.year === endWeek.year && cursor.week === endWeek.week) break;
+      cursor = shiftWeek(cursor, 1);
+    }
+    return weeks;
+  }, [chartWeeks, rangeFilter]);
+
   const neighborhoodSeries = useMemo(() => {
-    if (!chartWeeks || !chartWeekNeighborhoods) return [];
-    const weekKeys = chartWeeks.map((w) => `${w.year}-${w.week}`);
+    if (!filledChartWeeks || !chartWeekNeighborhoods) return [];
+    const weekKeys = filledChartWeeks.map((w) => `${w.year}-${w.week}`);
     const neighborhoods = Array.from(new Set(chartWeekNeighborhoods.map((n) => n.neighborhood))).sort((a, b) => {
       const totalA = chartWeekNeighborhoods.filter((n) => n.neighborhood === a).reduce((s, n) => s + n.collected, 0);
       const totalB = chartWeekNeighborhoods.filter((n) => n.neighborhood === b).reduce((s, n) => s + n.collected, 0);
@@ -282,7 +326,7 @@ function Dashboard() {
         return match?.collected ?? 0;
       }),
     }));
-  }, [chartWeeks, chartWeekNeighborhoods]);
+  }, [filledChartWeeks, chartWeekNeighborhoods]);
 
   const monthKeys = useMemo(() => {
     const keys = Array.from(new Set(stats?.weight_by_month.map((m) => `${m.year}-${m.month}`) ?? []));
@@ -464,20 +508,20 @@ function Dashboard() {
               </Select>
             </FormControl>
           </Stack>
-          {chartLoading || !chartWeeks ? (
+          {chartLoading || !filledChartWeeks ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
               <CircularProgress size={28} />
             </Box>
-          ) : chartWeeks.length > 0 ? (
+          ) : filledChartWeeks.length > 0 ? (
             <BarChart
               height={300}
               xAxis={[{
-                data: chartWeeks.map((w) => weekLabel(w.year, w.week)),
+                data: filledChartWeeks.map((w) => weekLabel(w.year, w.week)),
                 scaleType: "band",
                 label: strings.dashboard.weekLabel,
                 valueFormatter: (value, context) => {
                   if (context.location === "tooltip") {
-                    const week = chartWeeks.find((w) => weekLabel(w.year, w.week) === value);
+                    const week = filledChartWeeks.find((w) => weekLabel(w.year, w.week) === value);
                     return week ? formatMondayDate(week) : value;
                   }
                   return value;
