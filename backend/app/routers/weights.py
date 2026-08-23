@@ -58,7 +58,7 @@ def update_weight(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Weight entry not found")
     data = payload.model_dump(exclude_none=True)
     if "date" in data:
-        data["date"] = date.fromisoformat(data["date"])
+        data["date"] = date.fromisoformat(data["date"][:10])
     for field, value in data.items():
         setattr(entry, field, value)
     db.commit()
