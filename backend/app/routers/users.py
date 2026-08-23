@@ -5,6 +5,8 @@ email (see app/auth.py), so admins create user rows directly here. A user can
 be added before they ever sign in; on first sign-in they are matched by email.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -19,10 +21,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 def _find_user_by_email(db: Session, email: str) -> User:
+    """Look up an active (non-deactivated) user by email, or 404."""
     user = db.execute(
         select(User).where(func.lower(User.email) == email.lower())
     ).scalar_one_or_none()
-    if user is None:
+    if user is None or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 
@@ -32,8 +35,10 @@ def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ) -> list[User]:
-    """List all platform users."""
-    return db.execute(select(User).order_by(User.created_at)).scalars().all()
+    """List all active platform users (excludes deactivated ones)."""
+    return db.execute(
+        select(User).where(User.deleted_at.is_(None)).order_by(User.created_at)
+    ).scalars().all()
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -43,25 +48,41 @@ def create_user(
     admin: User = Depends(require_role("admin")),
 ) -> User:
     """Create a user by email + role. They gain access on their first sign-in
-    (matched by email)."""
+    (matched by email).
+
+    If the email belongs to a previously deactivated user, reactivates that
+    account (clearing `deleted_at`) instead of failing on the unique
+    constraint — the `id` and any resources they created stay linked.
+    """
     email = payload.email.strip().lower()
     existing = db.execute(
         select(User).where(func.lower(User.email) == email)
     ).scalar_one_or_none()
-    if existing is not None:
+
+    if existing is not None and existing.deleted_at is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="User already exists"
         )
 
-    user = User(
-        email=email, name=payload.name, role=payload.role, created_by=admin.id
-    )
-    db.add(user)
+    if existing is not None:
+        existing.deleted_at = None
+        existing.name = payload.name
+        existing.role = payload.role
+        existing.created_by = admin.id
+        user = existing
+        action = "update"
+    else:
+        user = User(
+            email=email, name=payload.name, role=payload.role, created_by=admin.id
+        )
+        db.add(user)
+        action = "create"
+
     db.flush()
     log_activity(
         db,
         user_id=admin.id,
-        action="create",
+        action=action,
         resource_type="user",
         resource_id=user.id,
         resource_name=user.email,
@@ -101,13 +122,16 @@ def delete_user(
     db: Session = Depends(get_db),
     admin: User = Depends(require_role("admin")),
 ) -> None:
-    """Delete a user. Admins cannot delete their own account."""
+    """Deactivate a user: hides them from the user list and blocks sign-in,
+    but keeps their `id` intact so PDRs and activity logs they created stay
+    attributable. Admins cannot delete their own account."""
     user = _find_user_by_email(db, email)
     if user.id == admin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot delete your own account",
         )
+    user.deleted_at = datetime.now(timezone.utc)
     log_activity(
         db,
         user_id=admin.id,
@@ -116,5 +140,4 @@ def delete_user(
         resource_id=user.id,
         resource_name=user.email,
     )
-    db.delete(user)
     db.commit()

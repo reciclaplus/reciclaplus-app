@@ -76,7 +76,9 @@ def get_current_user(
     Verifies the JWT, then matches the caller to a `users` row **by email**
     (the verified email claim). Platform users are keyed by their own uuid and
     are created directly by admins, so a valid Supabase identity whose email
-    has not been added to `users` is rejected (403).
+    has not been added to `users` is rejected (403). A deactivated (soft-
+    deleted) user is rejected the same way, even though their Supabase
+    identity still verifies.
     """
     claims = _decode_token(credentials.credentials)
     email = claims.get("email")
@@ -86,7 +88,7 @@ def get_current_user(
     user = db.execute(
         select(User).where(func.lower(User.email) == email.lower())
     ).scalar_one_or_none()
-    if user is None:
+    if user is None or user.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is not provisioned in this platform",
