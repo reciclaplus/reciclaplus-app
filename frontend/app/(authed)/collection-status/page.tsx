@@ -25,7 +25,7 @@ import { type IsoWeek, shiftWeek, formatWeekLabel } from "@/lib/week";
 interface StatusRow {
   pdr_id: string;
   name: string;
-  community: string;
+  description: string | null;
   neighborhood: string;
   status: Status | null;
 }
@@ -76,9 +76,11 @@ function NeighborhoodAccordion({ neighborhood, rows }: { neighborhood: string; r
                 <Typography noWrap sx={{ fontWeight: 500, fontSize: "0.875rem" }}>
                   {row.name}
                 </Typography>
-                <Typography noWrap sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-                  {row.community}
-                </Typography>
+                {row.description && (
+                  <Typography noWrap sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
+                    {row.description}
+                  </Typography>
+                )}
               </Box>
               <StatusPill status={row.status} />
             </Box>
