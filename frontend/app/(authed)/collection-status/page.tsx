@@ -149,7 +149,7 @@ function CollectionStatus() {
     return <Alert severity="error">{strings.collectionStatus.loadError}</Alert>;
   }
 
-  if (loading || !week) {
+  if (!week) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
         <CircularProgress />
@@ -179,7 +179,11 @@ function CollectionStatus() {
         )}
       </Box>
 
-      {neighborhoods.length === 0 ? (
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : neighborhoods.length === 0 ? (
         <Alert severity="info">{strings.collectionStatus.empty}</Alert>
       ) : (
         <Stack spacing={1}>
