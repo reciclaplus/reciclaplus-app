@@ -62,8 +62,8 @@ function stackedBarChart(opts: {
     )
     .join("");
   return `
-    <div style="display:flex;align-items:flex-end;gap:36px;height:${chartHeight}px;padding:0 16px;">${bars}</div>
-    <div style="display:flex;gap:36px;padding:0 16px;margin-top:6px;">${footers}</div>`;
+    <div style="display:flex;justify-content:center;align-items:flex-end;gap:36px;height:${chartHeight}px;padding:0 16px;">${bars}</div>
+    <div style="display:flex;justify-content:center;gap:36px;padding:0 16px;margin-top:6px;">${footers}</div>`;
 }
 
 export interface MonthlyReportOptions {
@@ -189,11 +189,11 @@ export function generateMonthlyReportHtml(
 
   const weightByTypeChart = plasticTypes.length
     ? `
-    <div style="display:flex;gap:12px;font-size:10.5px;font-weight:700;color:${COLORS.mutedAlt};margin-bottom:8px;">
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${COLORS.ink};opacity:1;margin-right:4px;"></span>${monthTitle}</span>
+    <div style="display:flex;justify-content:center;gap:12px;font-size:10.5px;font-weight:700;color:${COLORS.mutedAlt};margin-bottom:8px;">
       <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${COLORS.ink};opacity:0.35;margin-right:4px;"></span>${monthLabel(prev.year, prev.month)}</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${COLORS.ink};opacity:1;margin-right:4px;"></span>${monthTitle}</span>
     </div>
-    <div style="display:flex;align-items:flex-end;gap:22px;height:96px;padding:0 4px;">
+    <div style="display:flex;justify-content:center;align-items:flex-end;gap:22px;height:96px;padding:0 4px;">
       ${plasticTypes
         .map((t) => {
           const cur = weightRowsThisMonth.find((m) => m.plastic_type === t)?.weight_lbs ?? 0;
@@ -202,19 +202,19 @@ export function generateMonthlyReportHtml(
           const curH = Math.max(cur > 0 ? 2 : 0, Math.round((cur / maxWeight) * 96));
           const prvH = Math.max(prv > 0 ? 2 : 0, Math.round((prv / maxWeight) * 96));
           return `<div style="display:flex;align-items:flex-end;gap:5px;height:100%;">
-            <div style="width:20px;height:${curH}px;background:${color};border-radius:4px 4px 0 0;"></div>
             <div style="width:20px;height:${prvH}px;background:${color};opacity:0.35;border-radius:4px 4px 0 0;"></div>
+            <div style="width:20px;height:${curH}px;background:${color};border-radius:4px 4px 0 0;"></div>
           </div>`;
         })
         .join("")}
     </div>
-    <div style="display:flex;gap:22px;padding:0 4px;margin-top:6px;">
+    <div style="display:flex;justify-content:center;gap:22px;padding:0 4px;margin-top:6px;">
       ${plasticTypes
         .map((t) => {
           const cur = Math.round(weightRowsThisMonth.find((m) => m.plastic_type === t)?.weight_lbs ?? 0);
           const prv = Math.round(weightRowsPrevMonth.find((m) => m.plastic_type === t)?.weight_lbs ?? 0);
           const label = strings.weights.plasticTypes[t as keyof typeof strings.weights.plasticTypes] ?? t;
-          return `<div style="width:45px;font-size:11px;font-weight:700;color:${COLORS.ink};text-align:center;">${esc(label)}<div style="font-size:10px;font-weight:600;color:${COLORS.muted};">${cur}/${prv}</div></div>`;
+          return `<div style="width:45px;font-size:11px;font-weight:700;color:${COLORS.ink};text-align:center;">${esc(label)}<div style="font-size:10px;font-weight:600;color:${COLORS.muted};">${prv}/${cur}</div></div>`;
         })
         .join("")}
     </div>`
