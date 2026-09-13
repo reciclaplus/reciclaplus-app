@@ -50,7 +50,7 @@ export const strings = {
     list: "Listado",
     map: "Mapa",
     collectionPass: "Recogida semanal",
-    collectionStatus: "Recogidas por barrio",
+    collectionStatus: "Estado semanal",
     weights: "Registro de peso",
     dashboard: "Estadísticas",
     admin: "Configuración",
@@ -175,7 +175,7 @@ export const strings = {
     },
   },
   collectionStatus: {
-    title: "Recogidas por barrio",
+    title: "Estado semanal",
     today: "Semana actual",
     loadError: "No se pudo cargar la recogida de esta semana.",
     empty: "No hay puntos de recogida registrados.",
