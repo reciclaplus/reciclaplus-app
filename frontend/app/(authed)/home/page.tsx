@@ -16,7 +16,6 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import MapIcon from "@mui/icons-material/Map";
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
-import FactCheckIcon from "@mui/icons-material/FactCheck";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -262,27 +261,23 @@ function HomeContent() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 4.5 }}>
-          <Card
-            sx={{
-              height: "100%",
-              borderRadius: "22px",
-              bgcolor: COLORS.emeraldEnd,
-              border: "none",
-              p: { xs: 2.5, sm: 3 },
-              display: "flex",
-              alignItems: "center",
-              gap: 2.5,
-            }}
-          >
-            <ProgressDonut percent={percent} />
-            <Box>
-              <Typography sx={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-display)", color: "#fff" }}>
-                {recorded} / {total}
-              </Typography>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.8)", mt: 0.25 }}>
-                {strings.home.weekProgress}
-              </Typography>
-            </Box>
+          <Card sx={{ height: "100%", borderRadius: "22px", bgcolor: COLORS.emeraldEnd, border: "none" }}>
+            <CardActionArea
+              component={Link}
+              href="/collection-status"
+              sx={{ height: "100%", p: { xs: 2.5, sm: 3 }, display: "flex", alignItems: "center", gap: 2.5 }}
+            >
+              <ProgressDonut percent={percent} />
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-display)", color: "#fff" }}>
+                  {recorded} / {total}
+                </Typography>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.8)", mt: 0.25 }}>
+                  {strings.home.weekProgress}
+                </Typography>
+              </Box>
+              <ArrowForwardIcon sx={{ color: "rgba(255,255,255,.7)", flexShrink: 0 }} />
+            </CardActionArea>
           </Card>
         </Grid>
       </Grid>
@@ -324,14 +319,6 @@ function HomeContent() {
               icon={<MapIcon />}
               title={strings.nav.map}
               description={strings.home.mapDesc}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <QuickLinkCard
-              href="/collection-status"
-              icon={<FactCheckIcon />}
-              title={strings.nav.collectionStatus}
-              description={strings.home.collectionStatusDesc}
             />
           </Grid>
         </Grid>

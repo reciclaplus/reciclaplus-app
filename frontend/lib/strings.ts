@@ -34,7 +34,6 @@ export const strings = {
     dashboardDesc: "Ver estadísticas y métricas",
     listDesc: "Buscar y editar puntos de recogida",
     mapDesc: "Ver todos los puntos en el mapa",
-    collectionStatusDesc: "Ver el estado de recogida por barrio",
     greeting: "¡Hola, {name}!",
     rolePill: "Rol: {role}",
     weekProgress: "puntos registrados esta semana",
