@@ -27,6 +27,14 @@ export function formatMondayDate(w: IsoWeek): string {
   return `${dd}/${mm}/${mon.getUTCFullYear()}`;
 }
 
+/** Short "dd/mm" form of the week's Monday date, for space-constrained chart axis labels. */
+export function shortMondayDate(w: IsoWeek): string {
+  const mon = mondayOfWeek(w);
+  const dd = String(mon.getUTCDate()).padStart(2, "0");
+  const mm = String(mon.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
+}
+
 export function isoWeekOf(d: Date): IsoWeek {
   const thu = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   const dow = thu.getUTCDay() || 7;

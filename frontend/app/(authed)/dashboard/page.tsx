@@ -20,88 +20,25 @@ import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-dat
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
+import {
+  monthLabel,
+  monthTitleLabel,
+  NEIGHBORHOOD_COLORS,
+  PLASTIC_TYPE_COLORS,
+  weekLabel,
+  type DashboardStats,
+  type WeekCollections,
+  type WeekNeighborhoodCollections,
+} from "@/lib/dashboard";
+import { downloadMonthlyReport } from "@/lib/report";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import type { Pdr } from "@/lib/types";
-import { formatMondayDate, isoWeekOf, shiftWeek, type IsoWeek } from "@/lib/week";
+import { formatMondayDate, isoWeekOf, shiftWeek, shortMondayDate, type IsoWeek } from "@/lib/week";
 
 const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
 
-interface NeighborhoodCount {
-  neighborhood: string;
-  count: number;
-}
-interface CommunityCount {
-  community: string;
-  count: number;
-}
-interface CategoryCount {
-  category: string;
-  count: number;
-}
-interface WeekCollections {
-  year: number;
-  week: number;
-  collected: number;
-  empty: number;
-  unavailable: number;
-  closed: number;
-  total: number;
-}
-interface WeekNeighborhoodCollections {
-  year: number;
-  week: number;
-  neighborhood: string;
-  collected: number;
-}
-interface StatusBreakdown {
-  status: string;
-  count: number;
-}
-interface MonthWeight {
-  year: number;
-  month: number;
-  plastic_type: string;
-  weight_lbs: number;
-}
-interface DashboardStats {
-  total_pdrs: number;
-  pdrs_by_neighborhood: NeighborhoodCount[];
-  pdrs_by_community: CommunityCount[];
-  pdrs_by_category: CategoryCount[];
-  collections_by_week: WeekCollections[];
-  collections_by_week_by_neighborhood: WeekNeighborhoodCollections[];
-  current_status_breakdown: StatusBreakdown[];
-  weight_by_month: MonthWeight[];
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  collected: COLORS.status.collected.dot,
-  empty: COLORS.status.empty.dot,
-  unavailable: COLORS.status.unavailable.dot,
-  closed: COLORS.status.closed.dot,
-};
-
 const COMMUNITY_GREENS = ["#0d4e31", "#12633f", "#2e7d52", "#5a9c77", "#8fbca0", "#bcd5c6"];
-
-const PLASTIC_TYPE_COLORS: Record<string, string> = {
-  pet: "#12633f",
-  hdpe: "#f5951f",
-  pp: "#3c6e8f",
-  trash: "#8a3324",
-};
-
-const NEIGHBORHOOD_COLORS = [
-  "#0d4e31", // forest green
-  "#f5951f", // amber accent
-  "#1f7a72", // teal
-  "#c1440e", // terracotta
-  "#5a9c77", // sage
-  "#b9740b", // deep gold
-  "#3c6e8f", // slate blue
-  "#8a3324", // rust
-  "#7a9c4f", // olive
-];
 
 type WeekRange = "all" | "1w" | "1m" | "3m" | "6m" | "1y";
 
@@ -147,16 +84,6 @@ const latestPdrColumns: GridColDef<Pdr>[] = [
     ),
   },
 ];
-
-function weekLabel(year: number, week: number): string {
-  return `S${week}'${String(year).slice(-2)}`;
-}
-
-const MONTH_ABBR = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-function monthLabel(year: number, month: number): string {
-  return `${MONTH_ABBR[month - 1]}'${String(year).slice(-2)}`;
-}
 
 const RANGE_MONTHS: Partial<Record<WeekRange, number>> = { "1m": 1, "3m": 3, "6m": 6, "1y": 12 };
 
@@ -256,6 +183,41 @@ function Dashboard() {
 
   const [pdrs, setPdrs] = useState<Pdr[]>([]);
   const [addedWithin, setAddedWithin] = useState<AddedWithin>(30);
+
+  const [currentMonthKey] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [reportMonth, setReportMonth] = useState(currentMonthKey);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const [reportError, setReportError] = useState(false);
+
+  const reportMonthOptions = useMemo(() => {
+    const [anchorYear, anchorMonth] = currentMonthKey.split("-").map(Number);
+    const options: { value: string; label: string }[] = [];
+    const cursor = new Date(Date.UTC(anchorYear, anchorMonth - 1, 1));
+    for (let i = 0; i < 12; i++) {
+      const year = cursor.getUTCFullYear();
+      const month = cursor.getUTCMonth() + 1;
+      options.push({ value: `${year}-${String(month).padStart(2, "0")}`, label: monthTitleLabel(year, month) });
+      cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+    }
+    return options;
+  }, [currentMonthKey]);
+
+  const handleDownloadReport = () => {
+    if (!stats) return;
+    setReportError(false);
+    setReportGenerating(true);
+    try {
+      const [yearStr, monthStr] = reportMonth.split("-");
+      downloadMonthlyReport(stats, pdrs, Number(yearStr), Number(monthStr));
+    } catch {
+      setReportError(true);
+    } finally {
+      setReportGenerating(false);
+    }
+  };
 
   useEffect(() => {
     apiFetch<DashboardStats>("/dashboard/stats")
@@ -377,11 +339,31 @@ function Dashboard() {
         <Typography sx={{ fontSize: 30, fontWeight: 800, fontFamily: "var(--font-display)", letterSpacing: "-0.02em", color: COLORS.ink }}>
           {strings.dashboard.title}
         </Typography>
-        <Chip
-          label={strings.dashboard.downloadReportLabel}
-          sx={{ bgcolor: "#fff", border: `1px solid ${COLORS.hairlineSoft}`, fontWeight: 700, color: COLORS.body }}
-        />
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <FormControl size="small" sx={{ minWidth: 160, bgcolor: "#fff" }}>
+            <InputLabel id="report-month-label">{strings.dashboard.reportMonthLabel}</InputLabel>
+            <Select
+              labelId="report-month-label"
+              label={strings.dashboard.reportMonthLabel}
+              value={reportMonth}
+              onChange={(e: SelectChangeEvent) => setReportMonth(e.target.value)}
+            >
+              {reportMonthOptions.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Chip
+            label={reportGenerating ? strings.dashboard.generatingReport : strings.dashboard.downloadReportLabel}
+            onClick={handleDownloadReport}
+            disabled={reportGenerating}
+            sx={{ bgcolor: "#fff", border: `1px solid ${COLORS.hairlineSoft}`, fontWeight: 700, color: COLORS.body, cursor: "pointer" }}
+          />
+        </Stack>
       </Stack>
+      {reportError && <Alert severity="error">{strings.dashboard.reportError}</Alert>}
 
       {/* KPI tiles */}
       <Grid container spacing={2}>
@@ -520,11 +502,9 @@ function Dashboard() {
                 scaleType: "band",
                 label: strings.dashboard.weekLabel,
                 valueFormatter: (value, context) => {
-                  if (context.location === "tooltip") {
-                    const week = filledChartWeeks.find((w) => weekLabel(w.year, w.week) === value);
-                    return week ? formatMondayDate(week) : value;
-                  }
-                  return value;
+                  const week = filledChartWeeks.find((w) => weekLabel(w.year, w.week) === value);
+                  if (!week) return value;
+                  return context.location === "tooltip" ? formatMondayDate(week) : shortMondayDate(week);
                 },
               }]}
               series={neighborhoodSeries.map((s) => ({
@@ -618,7 +598,7 @@ function Dashboard() {
                       id: i,
                       value: s.count,
                       label: strings.collectionPass.statuses[s.status as keyof typeof strings.collectionPass.statuses] ?? s.status,
-                      color: STATUS_COLORS[s.status] ?? "#bdbdbd",
+                      color: COLORS.status[s.status as keyof typeof COLORS.status]?.dot ?? "#bdbdbd",
                     })),
                   }]}
                 />
