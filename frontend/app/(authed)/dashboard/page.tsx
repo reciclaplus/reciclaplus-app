@@ -507,13 +507,24 @@ function Dashboard() {
                   return context.location === "tooltip" ? formatMondayDate(week) : shortMondayDate(week);
                 },
               }]}
-              series={neighborhoodSeries.map((s) => ({
+              yAxis={[{ label: strings.dashboard.totalCollected }]}
+              series={neighborhoodSeries.map((s, i) => ({
                 data: s.data,
                 label: s.neighborhood,
                 stack: "total",
                 color: s.color,
+                ...(i === neighborhoodSeries.length - 1
+                  ? {
+                      barLabelPlacement: "outside" as const,
+                      barLabel: (item: { dataIndex: number }) => {
+                        const total = neighborhoodSeries.reduce((sum, n) => sum + (n.data[item.dataIndex] ?? 0), 0);
+                        return total > 0 ? String(total) : undefined;
+                      },
+                    }
+                  : {}),
               }))}
               borderRadius={6}
+              margin={{ top: 24 }}
             />
           ) : (
             <Typography sx={{ color: COLORS.muted, fontSize: 13.5 }}>—</Typography>
