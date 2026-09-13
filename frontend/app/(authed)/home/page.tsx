@@ -16,6 +16,7 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import MapIcon from "@mui/icons-material/Map";
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -323,6 +324,14 @@ function HomeContent() {
               icon={<MapIcon />}
               title={strings.nav.map}
               description={strings.home.mapDesc}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <QuickLinkCard
+              href="/collection-status"
+              icon={<FactCheckIcon />}
+              title={strings.nav.collectionStatus}
+              description={strings.home.collectionStatusDesc}
             />
           </Grid>
         </Grid>
