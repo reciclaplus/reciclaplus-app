@@ -17,9 +17,11 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef, type GridColumnVisibilityModel, type GridRenderCellParams } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { MapPicker, type LatLng } from "@/components/MapPicker";
@@ -106,6 +108,8 @@ function lastRecordedWeek(history: WeekStatus[]): WeekStatus | undefined {
 function PdrList() {
   const { user } = useAuth();
   const canWrite = user ? hasRole(user.role, "write") : false;
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [pdrs, setPdrs] = useState<PdrWithHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +122,19 @@ function PdrList() {
   const [editDraft, setEditDraft] = useState<Partial<PdrWithHistory>>({});
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PdrWithHistory | null>(null);
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<GridColumnVisibilityModel>({
+    created_at: false,
+  });
+
+  useEffect(() => {
+    setColumnVisibilityModel({
+      created_at: false,
+      category: !isMobile,
+      community: !isMobile,
+      lastWeekSort: !isMobile,
+      history: !isMobile,
+    });
+  }, [isMobile]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -237,21 +254,33 @@ function PdrList() {
       {
         field: "name",
         headerName: strings.list.colName,
-        flex: 1.6,
-        minWidth: 220,
+        flex: isMobile ? 1 : 1.6,
+        minWidth: isMobile ? 140 : 220,
         valueGetter: (_value, row) => `${row.name} ${row.description ?? ""}`.trim(),
-        renderCell: (params: GridRenderCellParams<PdrRow>) => (
-          <Box sx={{ display: "flex", alignItems: "center", height: "100%", minWidth: 0 }}>
-            <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
-              {params.row.name}
-            </Typography>
-            {params.row.description && (
-              <Typography noWrap sx={{ fontSize: 12, fontWeight: 500, color: COLORS.muted, ml: 1 }}>
-                {params.row.description}
+        renderCell: (params: GridRenderCellParams<PdrRow>) =>
+          isMobile ? (
+            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "100%", minWidth: 0 }}>
+              <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
+                {params.row.name}
               </Typography>
-            )}
-          </Box>
-        ),
+              {params.row.description && (
+                <Typography noWrap sx={{ fontSize: 11.5, fontWeight: 500, color: COLORS.muted }}>
+                  {params.row.description}
+                </Typography>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", alignItems: "center", height: "100%", minWidth: 0 }}>
+              <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-display)", color: COLORS.ink }}>
+                {params.row.name}
+              </Typography>
+              {params.row.description && (
+                <Typography noWrap sx={{ fontSize: 12, fontWeight: 500, color: COLORS.muted, ml: 1 }}>
+                  {params.row.description}
+                </Typography>
+              )}
+            </Box>
+          ),
       },
       {
         field: "category",
@@ -337,7 +366,7 @@ function PdrList() {
         ),
       },
     ],
-    [],
+    [isMobile],
   );
 
   if (error) {
@@ -429,9 +458,10 @@ function PdrList() {
           disableRowSelectionOnClick
           onRowClick={(params) => (canWrite ? openEdit(params.row as PdrWithHistory) : undefined)}
           pageSizeOptions={[10, 25, 50]}
+          columnVisibilityModel={columnVisibilityModel}
+          onColumnVisibilityModelChange={setColumnVisibilityModel}
           initialState={{
             pagination: { paginationModel: { pageSize: 10 } },
-            columns: { columnVisibilityModel: { created_at: false } },
           }}
           sx={{
             bgcolor: "#fff",
