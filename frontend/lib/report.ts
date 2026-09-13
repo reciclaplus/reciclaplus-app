@@ -9,14 +9,13 @@ import {
   monthTitleLabel,
   NEIGHBORHOOD_COLORS,
   PLASTIC_TYPE_COLORS,
-  weekLabel,
   type DashboardStats,
   type WeekCollections,
 } from "@/lib/dashboard";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import type { Pdr } from "@/lib/types";
-import { mondayOfWeek } from "@/lib/week";
+import { mondayOfWeek, shortMondayDate } from "@/lib/week";
 
 function prevMonth(year: number, month: number): { year: number; month: number } {
   return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
@@ -58,7 +57,7 @@ function stackedBarChart(opts: {
   const footers = weeks
     .map(
       (w) =>
-        `<div style="width:56px;text-align:center;font-size:10.5px;font-weight:700;color:${COLORS.mutedAlt};">${weekLabel(w.year, w.week)} · ${totalFor(w)}</div>`
+        `<div style="width:56px;text-align:center;font-size:10.5px;font-weight:700;color:${COLORS.mutedAlt};">${shortMondayDate(w)} · ${totalFor(w)}</div>`
     )
     .join("");
   return `
