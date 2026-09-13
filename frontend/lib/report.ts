@@ -15,7 +15,7 @@ import {
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import type { Pdr } from "@/lib/types";
-import { mondayOfWeek, shortMondayDate } from "@/lib/week";
+import { formatMondayDate, mondayOfWeek, shortMondayDate } from "@/lib/week";
 
 function prevMonth(year: number, month: number): { year: number; month: number } {
   return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
@@ -37,32 +37,62 @@ function weeksInMonth(weeks: WeekCollections[], year: number, month: number): We
 
 function stackedBarChart(opts: {
   weeks: WeekCollections[];
-  segmentsFor: (w: WeekCollections) => { color: string; value: number }[];
+  segmentsFor: (w: WeekCollections) => { color: string; value: number; label: string }[];
   totalFor: (w: WeekCollections) => number;
   chartHeight: number;
 }): string {
   const { weeks, segmentsFor, totalFor, chartHeight } = opts;
   const maxTotal = Math.max(1, ...weeks.map(totalFor));
+  const axisWidth = 24;
+
+  const axis = `
+    <div style="width:${axisWidth}px;height:${chartHeight}px;position:relative;flex-shrink:0;">
+      <span style="position:absolute;top:-5px;right:4px;font-size:9px;font-weight:700;color:${COLORS.mutedAlt};">${maxTotal}</span>
+      <span style="position:absolute;top:calc(50% - 5px);right:4px;font-size:9px;font-weight:700;color:${COLORS.mutedAlt};">${Math.round(maxTotal / 2)}</span>
+      <span style="position:absolute;bottom:-5px;right:4px;font-size:9px;font-weight:700;color:${COLORS.mutedAlt};">0</span>
+    </div>`;
+
+  const gridlines = `
+    <div style="position:absolute;inset:0;height:${chartHeight}px;pointer-events:none;">
+      <div style="position:absolute;top:0;left:0;right:0;border-top:1px solid ${COLORS.hairline};"></div>
+      <div style="position:absolute;top:50%;left:0;right:0;border-top:1px dashed ${COLORS.hairline};"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;border-top:1px solid ${COLORS.hairline};"></div>
+    </div>`;
+
   const bars = weeks
     .map((w) => {
-      const segments = segmentsFor(w)
+      const total = totalFor(w);
+      const segments = segmentsFor(w);
+      const breakdown = segments
+        .filter((s) => s.value > 0)
+        .map((s) => `${s.label}: ${s.value}`)
+        .join(", ");
+      const tooltip = esc(`${formatMondayDate(w)} — Total: ${total}${breakdown ? ` (${breakdown})` : ""}`);
+      const segmentDivs = segments
         .map((s) => {
           const h = s.value > 0 ? Math.max(2, Math.round((s.value / maxTotal) * chartHeight)) : 0;
-          return h > 0 ? `<div style="height:${h}px;background:${s.color};"></div>` : "";
+          return h > 0 ? `<div style="height:${h}px;background:${s.color};" title="${esc(s.label)}: ${s.value}"></div>` : "";
         })
         .join("");
-      return `<div style="display:flex;flex-direction:column-reverse;width:56px;border-radius:4px 4px 0 0;overflow:hidden;">${segments}</div>`;
+      return `
+        <div style="position:relative;width:56px;" title="${tooltip}">
+          <div style="position:absolute;bottom:100%;left:0;right:0;margin-bottom:2px;text-align:center;font-size:11px;font-weight:800;color:${COLORS.ink};">${total}</div>
+          <div style="display:flex;flex-direction:column-reverse;width:56px;border-radius:4px 4px 0 0;overflow:hidden;">${segmentDivs}</div>
+        </div>`;
     })
     .join("");
   const footers = weeks
-    .map(
-      (w) =>
-        `<div style="width:56px;text-align:center;font-size:10.5px;font-weight:700;color:${COLORS.mutedAlt};">${shortMondayDate(w)} · ${totalFor(w)}</div>`
-    )
+    .map((w) => `<div style="width:56px;text-align:center;font-size:10.5px;font-weight:700;color:${COLORS.mutedAlt};">${shortMondayDate(w)}</div>`)
     .join("");
   return `
-    <div style="display:flex;justify-content:center;align-items:flex-end;gap:36px;height:${chartHeight}px;padding:0 16px;">${bars}</div>
-    <div style="display:flex;justify-content:center;gap:36px;padding:0 16px;margin-top:6px;">${footers}</div>`;
+    <div style="display:flex;align-items:flex-end;">
+      ${axis}
+      <div style="flex:1;position:relative;">
+        ${gridlines}
+        <div style="display:flex;justify-content:center;align-items:flex-end;gap:36px;height:${chartHeight}px;padding:0 16px;position:relative;">${bars}</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;gap:36px;padding:0 16px;margin-top:6px;margin-left:${axisWidth}px;">${footers}</div>`;
 }
 
 export interface MonthlyReportOptions {
@@ -160,6 +190,7 @@ export function generateMonthlyReportHtml(
           neighborhoods.map((n, i) => ({
             color: NEIGHBORHOOD_COLORS[i % NEIGHBORHOOD_COLORS.length],
             value: neighborhoodRowsThisMonth.find((r) => r.neighborhood === n && r.year === w.year && r.week === w.week)?.collected ?? 0,
+            label: n,
           })),
         totalFor: (w) => neighborhoodRowsThisMonth.filter((r) => r.year === w.year && r.week === w.week).reduce((sum, r) => sum + r.collected, 0),
         chartHeight: 82,
@@ -174,7 +205,12 @@ export function generateMonthlyReportHtml(
   const weeklyByStatusChart = weeks.length
     ? stackedBarChart({
         weeks,
-        segmentsFor: (w) => STATUSES.map((status) => ({ color: COLORS.status[status].dot, value: w[status] })),
+        segmentsFor: (w) =>
+          STATUSES.map((status) => ({
+            color: COLORS.status[status].dot,
+            value: w[status],
+            label: strings.collectionPass.statuses[status],
+          })),
         totalFor: (w) => w.total,
         chartHeight: 64,
       })
