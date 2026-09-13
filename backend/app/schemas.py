@@ -118,6 +118,7 @@ class CollectionPassRow(BaseModel):
     pdr_id: uuid.UUID
     internal_id: int
     name: str
+    description: str | None
     community: str
     neighborhood: str
     category: str

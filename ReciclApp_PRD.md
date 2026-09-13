@@ -114,6 +114,19 @@ Private analytics dashboard:
 
 ---
 
+### 4.6a Collection Status — `/collection-status`
+
+**Access:** `read`  
+Read-only view of a selected week's collection pass, grouped by
+neighborhood. Lets a supervisor check, without editing, which PDRs have been
+collected (and with what status) for any week. Defaults to the current ISO
+week; a week can be paged with previous/next controls, same as Collection
+Pass. Each neighborhood is shown collapsed with a collected/total count next
+to its name, expanding to list every PDR in it with its recorded status
+(`collected` / `empty` / `unavailable` / `closed`, or unrecorded).
+
+---
+
 ### 4.7 Weight Tracking — `/weights`
 
 **Access:** `write`  

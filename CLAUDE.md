@@ -63,7 +63,7 @@ Hierarchical roles: `read` < `write` < `admin`. Each inherits the lower role's p
 
 ## Frontend Conventions
 
-- Pages: `/` (public landing), `/info` (public help), `/list`, `/map`, `/dashboard` (read), `/weights`, `/new-pdr`, `/collection-pass` (write), `/admin` (admin).
+- Pages: `/` (public landing), `/info` (public help), `/list`, `/map`, `/dashboard`, `/collection-status` (read), `/weights`, `/new-pdr`, `/collection-pass` (write), `/admin` (admin).
 - Route names are kebab-case English.
 - Mobile-first: field operators use phones. Every page must work on small screens.
 - Keep components simple — non-technical users; minimize friction in forms.

@@ -18,6 +18,7 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import MapIcon from "@mui/icons-material/Map";
 import MenuIcon from "@mui/icons-material/Menu";
 import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -43,6 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/list", label: strings.nav.list, minimum: "read", icon: <ListAltIcon fontSize="small" /> },
   { href: "/map", label: strings.nav.map, minimum: "read", icon: <MapIcon fontSize="small" /> },
   { href: "/dashboard", label: strings.nav.dashboard, minimum: "read", icon: <DashboardIcon fontSize="small" /> },
+  { href: "/collection-status", label: strings.nav.collectionStatus, minimum: "read", icon: <FactCheckIcon fontSize="small" /> },
 ];
 
 const NAV_ITEMS_SECONDARY: NavItem[] = [

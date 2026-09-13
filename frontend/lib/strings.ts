@@ -49,6 +49,7 @@ export const strings = {
     list: "Listado",
     map: "Mapa",
     collectionPass: "Recogida semanal",
+    collectionStatus: "Estado semanal",
     weights: "Registro de peso",
     dashboard: "Estadísticas",
     admin: "Configuración",
@@ -171,6 +172,14 @@ export const strings = {
       unavailable: "No disponible",
       closed: "Cerrado",
     },
+  },
+  collectionStatus: {
+    title: "Estado semanal",
+    today: "Semana actual",
+    loadError: "No se pudo cargar la recogida de esta semana.",
+    empty: "No hay puntos de recogida registrados.",
+    notSet: "Sin registrar",
+    collectedSuffix: "recogidos",
   },
   newPdr: {
     title: "Nuevo punto de recogida",
