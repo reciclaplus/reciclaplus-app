@@ -9,6 +9,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user, require_role
@@ -33,6 +34,16 @@ def _get_town_or_404(db: Session, town_id: uuid.UUID) -> Town:
     if town is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Town not found")
     return town
+
+
+def _delete_unless_in_use(db: Session, resource: object, in_use_detail: str) -> None:
+    """Delete a config row, or 409 if PDRs or weights still reference it."""
+    try:
+        db.delete(resource)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=in_use_detail) from exc
 
 
 # --- Reads (authenticated) ---
@@ -99,8 +110,11 @@ def delete_town(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ) -> None:
-    db.delete(_get_town_or_404(db, town_id))
-    db.commit()
+    _delete_unless_in_use(
+        db,
+        _get_town_or_404(db, town_id),
+        "No se puede eliminar: este proyecto tiene datos asociados.",
+    )
 
 
 # --- Community writes (admin) ---
@@ -149,8 +163,11 @@ def delete_community(
     community = db.get(Community, community_id)
     if community is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Community not found")
-    db.delete(community)
-    db.commit()
+    _delete_unless_in_use(
+        db,
+        community,
+        "No se puede eliminar: esta comunidad tiene puntos de recogida asociados.",
+    )
 
 
 # --- Neighborhood writes (admin) ---
@@ -201,5 +218,8 @@ def delete_neighborhood(
     neighborhood = db.get(Neighborhood, neighborhood_id)
     if neighborhood is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Neighborhood not found")
-    db.delete(neighborhood)
-    db.commit()
+    _delete_unless_in_use(
+        db,
+        neighborhood,
+        "No se puede eliminar: este barrio tiene puntos de recogida asociados.",
+    )

@@ -3,8 +3,9 @@ tables. These drive the dropdown options on the PDR form.
 """
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +23,16 @@ class Town(Base):
     map_center_lng: Mapped[float] = mapped_column(Float, nullable=False)
     categories: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list
+    )
+    map_zoom: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("13")
+    )
+    plastic_types: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, server_default=text("array['pet', 'hdpe', 'pp', 'trash']")
+    )
+    report_partner_text: Mapped[str | None] = mapped_column(String, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     communities: Mapped[list["Community"]] = relationship(

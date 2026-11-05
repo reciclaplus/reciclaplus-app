@@ -23,6 +23,10 @@ class ActivityLog(Base):
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # Null for global actions, such as account changes.
+    town_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("towns.id", ondelete="SET NULL"), nullable=True
+    )
     action: Mapped[str] = mapped_column(String, nullable=False)
     resource_type: Mapped[str] = mapped_column(String, nullable=False)
     resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)

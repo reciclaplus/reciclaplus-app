@@ -11,6 +11,7 @@ from app.activity_log import log_activity
 from app.auth import require_role
 from app.db import get_db
 from app.isoweek import current_iso_week
+from app.legacy_town import legacy_town_id, resolve_neighborhood_id
 from app.models.collection import Collection
 from app.models.pdr import Pdr
 from app.models.user import User
@@ -114,12 +115,21 @@ def create_pdr(
     user: User = Depends(require_role("write")),
 ) -> Pdr:
     """Create a new pickup point."""
-    pdr = Pdr(**payload.model_dump(), created_by=user.id)
+    town_id = legacy_town_id(db)
+    pdr = Pdr(
+        **payload.model_dump(),
+        created_by=user.id,
+        town_id=town_id,
+        neighborhood_id=resolve_neighborhood_id(
+            db, town_id, payload.community, payload.neighborhood
+        ),
+    )
     db.add(pdr)
     db.flush()
     log_activity(
         db,
         user_id=user.id,
+        town_id=town_id,
         action="create",
         resource_type="pdr",
         resource_id=pdr.id,
@@ -140,11 +150,20 @@ def update_pdr(
     pdr = db.get(Pdr, pdr_id)
     if pdr is None or pdr.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDR not found")
-    for field, value in payload.model_dump(exclude_none=True).items():
+    changes = payload.model_dump(exclude_none=True)
+    for field, value in changes.items():
         setattr(pdr, field, value)
+    # Only relink when the location was sent, so editing other fields can't
+    # unlink a PDR whose barrio has been renamed since (its text is now stale).
+    if "community" in changes or "neighborhood" in changes:
+        pdr.town_id = legacy_town_id(db)
+        pdr.neighborhood_id = resolve_neighborhood_id(
+            db, pdr.town_id, pdr.community, pdr.neighborhood
+        )
     log_activity(
         db,
         user_id=user.id,
+        town_id=pdr.town_id,
         action="update",
         resource_type="pdr",
         resource_id=pdr.id,
@@ -170,6 +189,7 @@ def delete_pdr(
     log_activity(
         db,
         user_id=user.id,
+        town_id=pdr.town_id,
         action="delete",
         resource_type="pdr",
         resource_id=pdr.id,

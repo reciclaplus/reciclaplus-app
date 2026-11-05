@@ -29,6 +29,14 @@ class Pdr(Base):
     community: Mapped[str] = mapped_column(String, nullable=False)
     neighborhood: Mapped[str] = mapped_column(String, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
+    # Nullable until the multi-town contract phase, which also drops the
+    # community/neighborhood text columns above.
+    town_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("towns.id", ondelete="RESTRICT"), nullable=True
+    )
+    neighborhood_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("neighborhoods.id", ondelete="RESTRICT"), nullable=True
+    )
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lng: Mapped[float] = mapped_column(Float, nullable=False)
     route_order: Mapped[int | None] = mapped_column(
