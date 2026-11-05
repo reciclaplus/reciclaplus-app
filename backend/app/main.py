@@ -10,7 +10,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, collections, dashboard, pdrs, towns, users, weights
+from app.routers import (
+    auth,
+    collections,
+    dashboard,
+    members,
+    pdrs,
+    town_collections,
+    town_dashboard,
+    town_pdrs,
+    town_weights,
+    towns,
+    users,
+    weights,
+)
 
 app = FastAPI(title="ReciclApp API")
 
@@ -25,6 +38,12 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(towns.router)
+app.include_router(members.router)
+app.include_router(town_pdrs.router)
+app.include_router(town_collections.router)
+app.include_router(town_weights.router)
+app.include_router(town_dashboard.router)
+# Legacy unscoped routes, removed in the multi-town contract phase.
 app.include_router(pdrs.router)
 app.include_router(collections.router)
 app.include_router(users.router)

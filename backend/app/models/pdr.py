@@ -9,9 +9,10 @@ from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Identity, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+from app.models.town import Neighborhood
 
 
 class Pdr(Base):
@@ -51,3 +52,5 @@ class Pdr(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    location: Mapped[Neighborhood | None] = relationship()

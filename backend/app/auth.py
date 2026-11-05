@@ -2,10 +2,12 @@
 
 Verifies Supabase-issued JWTs (HS256 via the legacy shared secret, or
 asymmetric algorithms via the project's JWKS endpoint), resolves the caller's
-platform role from the `users` table, and provides the reusable role-hierarchy
-dependency `require_role`. Every protected endpoint depends on this module.
+platform identity from the `users` table, and provides the per-town permission
+dependencies. Every protected endpoint depends on this module.
 """
 
+import uuid
+from dataclasses import dataclass
 from functools import lru_cache
 
 import jwt
@@ -16,6 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
+from app.models.town import Community, Neighborhood, Town
+from app.models.town_member import TownMember
 from app.models.user import User
 
 # Hierarchical roles: each inherits the permissions of those below it.
@@ -97,7 +101,11 @@ def get_current_user(
 
 
 def require_role(minimum: str):
-    """Dependency factory enforcing a minimum role (hierarchical)."""
+    """Dependency factory enforcing a minimum global role (hierarchical).
+
+    Legacy: only for the unscoped routes, removed in the multi-town contract
+    phase. New routes use require_town_role.
+    """
     required_level = ROLE_LEVELS[minimum]
 
     def checker(user: User = Depends(get_current_user)) -> User:
@@ -109,3 +117,109 @@ def require_role(minimum: str):
         return user
 
     return checker
+
+
+@dataclass(frozen=True)
+class TownAccess:
+    """A caller's verified access to one town."""
+
+    user: User
+    town: Town
+    role: str
+
+
+def _check_town_access(db: Session, user: User, town: Town, minimum: str) -> TownAccess:
+    """Authorize a user for a town, or raise 403.
+
+    Superadmins act as admin in every town without a membership. An archived
+    town blocks everyone: superadmins restore it through its own endpoint.
+    """
+    if user.is_superadmin:
+        role = "admin"
+    else:
+        role = db.scalar(
+            select(TownMember.role).where(
+                TownMember.user_id == user.id, TownMember.town_id == town.id
+            )
+        )
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes acceso a este proyecto",
+            )
+    if town.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este proyecto está archivado",
+        )
+    if ROLE_LEVELS.get(role, -1) < ROLE_LEVELS[minimum]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires '{minimum}' role in this town",
+        )
+    return TownAccess(user=user, town=town, role=role)
+
+
+def require_town_role(minimum: str):
+    """Dependency factory for routes with a {town_id} path parameter.
+
+    Returns the caller's TownAccess: 404 for an unknown town, 403 otherwise if
+    the caller lacks the minimum role there or the town is archived.
+    """
+
+    def checker(
+        town_id: uuid.UUID,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> TownAccess:
+        town = db.get(Town, town_id)
+        if town is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Town not found")
+        return _check_town_access(db, user, town, minimum)
+
+    return checker
+
+
+def require_community_role(minimum: str):
+    """Like require_town_role, for routes with a {community_id} path parameter:
+    authorizes against the community's own town."""
+
+    def checker(
+        community_id: uuid.UUID,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> TownAccess:
+        community = db.get(Community, community_id)
+        if community is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Community not found")
+        return _check_town_access(db, user, db.get(Town, community.town_id), minimum)
+
+    return checker
+
+
+def require_neighborhood_role(minimum: str):
+    """Like require_town_role, for routes with a {neighborhood_id} path
+    parameter: authorizes against the neighborhood's own town."""
+
+    def checker(
+        neighborhood_id: uuid.UUID,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> TownAccess:
+        neighborhood = db.get(Neighborhood, neighborhood_id)
+        if neighborhood is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Neighborhood not found")
+        community = db.get(Community, neighborhood.community_id)
+        return _check_town_access(db, user, db.get(Town, community.town_id), minimum)
+
+    return checker
+
+
+def require_superadmin(user: User = Depends(get_current_user)) -> User:
+    """Dependency for global actions: creating, archiving, restoring and deleting
+    towns."""
+    if not user.is_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Requires superadmin"
+        )
+    return user

@@ -83,6 +83,7 @@ Practical rules:
 ## Quality Bar
 
 - Business logic must be unit-testable; critical backend endpoints need integration tests.
+- Backend integration tests live in `backend/tests/`. Run them with `TEST_DATABASE_URL=<test project URL> uv run pytest` from `backend/`. Each test runs in a rolled-back transaction because the test database is shared, and the suite refuses production. New town-scoped routes are covered by the isolation test automatically; any other new route must be listed in `UNSCOPED_ROUTES` in `backend/tests/test_town_isolation.py`.
 - Document public functions, API endpoints, and non-obvious logic.
 - Follow standard Next.js and FastAPI best practices — clear separation of concerns, no unnecessary complexity.
 

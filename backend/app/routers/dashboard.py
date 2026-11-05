@@ -1,6 +1,7 @@
 """Dashboard statistics endpoint."""
 
 import calendar
+import uuid
 from datetime import date, timedelta
 from typing import Literal
 
@@ -42,11 +43,13 @@ def _range_cutoff(week_range: WeekRange) -> date | None:
 class NeighborhoodCount(BaseModel):
     neighborhood: str
     count: int
+    neighborhood_id: uuid.UUID | None = None
 
 
 class CommunityCount(BaseModel):
     community: str
     count: int
+    community_id: uuid.UUID | None = None
 
 
 class CategoryCount(BaseModel):
@@ -74,6 +77,7 @@ class WeekNeighborhoodCollections(BaseModel):
     week: int
     neighborhood: str
     collected: int
+    neighborhood_id: uuid.UUID | None = None
 
 
 class MonthWeight(BaseModel):
