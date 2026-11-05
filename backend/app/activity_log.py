@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from app.models.activity_log import ActivityLog
 
 ActivityAction = Literal["create", "update", "delete"]
-ActivityResourceType = Literal["pdr", "user"]
+ActivityResourceType = Literal[
+    "pdr", "user", "town", "community", "neighborhood", "collection", "weight", "member"
+]
 
 
 def log_activity(
@@ -19,15 +21,18 @@ def log_activity(
     resource_type: ActivityResourceType,
     resource_id: uuid.UUID,
     resource_name: str,
+    town_id: uuid.UUID | None = None,
 ) -> None:
     """Record a mutating action. Joins the caller's transaction; does not commit.
 
     resource_name is a snapshot (not a live join) so the log stays readable
     after the resource is renamed or, for hard-deleted users, gone entirely.
+    town_id is None for global actions, such as account changes.
     """
     db.add(
         ActivityLog(
             user_id=user_id,
+            town_id=town_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,

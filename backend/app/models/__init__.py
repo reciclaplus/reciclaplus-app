@@ -1,6 +1,7 @@
 from app.models.base import Base
 from app.models.user import User
 from app.models.town import Town, Community, Neighborhood
+from app.models.town_member import TownMember
 from app.models.pdr import Pdr
 from app.models.collection import Collection
 from app.models.weight_entry import WeightEntry
@@ -11,6 +12,7 @@ __all__ = [
     "Town",
     "Community",
     "Neighborhood",
+    "TownMember",
     "Pdr",
     "Collection",
     "WeightEntry",

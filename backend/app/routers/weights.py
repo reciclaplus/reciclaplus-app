@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_role
 from app.db import get_db
+from app.legacy_town import legacy_town_id
 from app.models.weight_entry import WeightEntry
 from app.models.user import User
 from app.schemas import WeightEntryCreate, WeightEntryOut, WeightEntryUpdate
@@ -34,6 +35,7 @@ def create_weight(
     user: User = Depends(require_role("write")),
 ) -> WeightEntryOut:
     entry = WeightEntry(
+        town_id=legacy_town_id(db),
         date=date.fromisoformat(payload.date),
         plastic_type=payload.plastic_type,
         weight_lbs=payload.weight_lbs,
