@@ -341,18 +341,37 @@ def test_adding_a_member_twice_is_a_conflict(db, api, town_a):
     assert db.get(TownMember, (member.id, town_a.town.id)).role == "read"
 
 
-def test_add_member_reactivates_deactivated_account(db, api, town_a):
+def _deactivated_user(db):
+    user = make_user(db)
+    user.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return user
+
+
+def test_town_admin_cannot_reactivate_deactivated_account(db, api, town_a):
     admin = make_user(db)
     add_member(db, admin, town_a.town, "admin")
-    former = make_user(db)
-    former.deleted_at = datetime.now(timezone.utc)
-    db.flush()
+    former = _deactivated_user(db)
     response = api.as_user(admin).post(
+        f"/towns/{town_a.town.id}/members", json={"email": former.email, "role": "write"}
+    )
+    assert response.status_code == 403
+    assert "superadministrador" in response.json()["detail"]
+    db.refresh(former)
+    assert former.deleted_at is not None
+    assert db.get(TownMember, (former.id, town_a.town.id)) is None
+    assert _logs(db, town_a.town.id, "member") == []
+
+
+def test_superadmin_can_reactivate_deactivated_account(db, api, town_a):
+    former = _deactivated_user(db)
+    response = api.as_user(make_user(db, superadmin=True)).post(
         f"/towns/{town_a.town.id}/members", json={"email": former.email, "role": "write"}
     )
     assert response.status_code == 201
     db.refresh(former)
     assert former.deleted_at is None
+    assert db.get(TownMember, (former.id, town_a.town.id)).role == "write"
 
 
 def test_change_role_and_remove_member(db, api, town_a, town_b):

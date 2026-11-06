@@ -84,9 +84,10 @@ def add_member(
     db: Session = Depends(get_db),
     access: TownAccess = Depends(require_town_role("admin")),
 ) -> MemberOut:
-    """Add a user to this town by email. Creates the account if it doesn't exist
-    or reactivates a deactivated one; they gain access on sign-in, matched by
-    email. An existing active account only gains this membership."""
+    """Add a user to this town by email. Creates the account if it doesn't exist;
+    they gain access on sign-in, matched by email. An existing active account only
+    gains this membership. A deactivated account can only be reactivated this way
+    by a superadmin (403 for town admins)."""
     email = payload.email.strip().lower()
     user = db.execute(
         select(User).where(func.lower(User.email) == email)
@@ -99,6 +100,12 @@ def add_member(
         db.add(user)
         db.flush()
     elif user.deleted_at is not None:
+        # A deactivation can be deliberate, so only a superadmin may undo it.
+        if not access.user.is_superadmin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Esta cuenta está desactivada. Contacta con un superadministrador.",
+            )
         user.deleted_at = None
         user.name = payload.name
     elif db.get(TownMember, (user.id, access.town.id)) is not None:
