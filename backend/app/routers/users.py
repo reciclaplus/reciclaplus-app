@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.activity_log import log_activity
 from app.auth import require_role
 from app.db import get_db
+from app.legacy_town import sync_legacy_membership
 from app.models.user import User
 from app.schemas import UserCreate, UserOut, UserUpdate
 
@@ -79,6 +80,7 @@ def create_user(
         action = "create"
 
     db.flush()
+    sync_legacy_membership(db, user.id, payload.role)
     log_activity(
         db,
         user_id=admin.id,
@@ -103,6 +105,7 @@ def update_user(
     user = _find_user_by_email(db, email)
     user.role = payload.role
     user.name = payload.name
+    sync_legacy_membership(db, user.id, payload.role)
     log_activity(
         db,
         user_id=admin.id,

@@ -5,8 +5,10 @@ from app.models.town_member import TownMember
 from app.models.pdr import Pdr
 from app.models.collection import Collection
 from app.models.weight_entry import WeightEntry
+from app.models.activity_log import ActivityLog
 
 __all__ = [
+    "ActivityLog",
     "Base",
     "User",
     "Town",
