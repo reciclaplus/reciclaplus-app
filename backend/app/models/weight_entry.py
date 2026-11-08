@@ -15,9 +15,8 @@ class WeightEntry(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    # Nullable until the multi-town contract phase.
-    town_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("towns.id", ondelete="RESTRICT"), nullable=True
+    town_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("towns.id", ondelete="RESTRICT"), nullable=False
     )
     date: Mapped[date] = mapped_column(
         Date, nullable=False, server_default=func.current_date()

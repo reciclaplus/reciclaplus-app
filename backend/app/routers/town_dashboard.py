@@ -4,9 +4,13 @@ Groups by neighborhood and community ID rather than name, so two barrios with th
 same name in different communities stay separate.
 """
 
+import calendar
 import uuid
+from datetime import date, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,20 +20,86 @@ from app.models.collection import Collection
 from app.models.pdr import Pdr
 from app.models.town import Community, Neighborhood
 from app.models.weight_entry import WeightEntry
-from app.routers.dashboard import (
-    CategoryCount,
-    CommunityCount,
-    DashboardStats,
-    MonthWeight,
-    NeighborhoodCount,
-    StatusBreakdown,
-    WeekCollections,
-    WeekNeighborhoodCollections,
-    WeekRange,
-    _range_cutoff,
-)
 
 router = APIRouter(prefix="/towns/{town_id}/dashboard", tags=["dashboard"])
+
+WeekRange = Literal["1w", "1m", "3m", "6m", "1y", "all"]
+
+_RANGE_MONTHS: dict[str, int] = {"1m": 1, "3m": 3, "6m": 6, "1y": 12}
+
+
+def _months_ago(d: date, months: int) -> date:
+    """Subtract `months` from `d`, clamping the day to the target month's length."""
+    total = d.month - 1 - months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _range_cutoff(week_range: WeekRange) -> date | None:
+    if week_range == "1w":
+        return date.today() - timedelta(weeks=1)
+    months = _RANGE_MONTHS.get(week_range)
+    return _months_ago(date.today(), months) if months else None
+
+
+class NeighborhoodCount(BaseModel):
+    neighborhood: str
+    count: int
+    neighborhood_id: uuid.UUID | None = None
+
+
+class CommunityCount(BaseModel):
+    community: str
+    count: int
+    community_id: uuid.UUID | None = None
+
+
+class CategoryCount(BaseModel):
+    category: str
+    count: int
+
+
+class WeekCollections(BaseModel):
+    year: int
+    week: int
+    collected: int
+    empty: int
+    unavailable: int
+    closed: int
+    total: int
+
+
+class StatusBreakdown(BaseModel):
+    status: str
+    count: int
+
+
+class WeekNeighborhoodCollections(BaseModel):
+    year: int
+    week: int
+    neighborhood: str
+    collected: int
+    neighborhood_id: uuid.UUID | None = None
+
+
+class MonthWeight(BaseModel):
+    year: int
+    month: int
+    plastic_type: str
+    weight_lbs: float
+
+
+class DashboardStats(BaseModel):
+    total_pdrs: int
+    pdrs_by_neighborhood: list[NeighborhoodCount]
+    pdrs_by_community: list[CommunityCount]
+    pdrs_by_category: list[CategoryCount]
+    collections_by_week: list[WeekCollections]
+    collections_by_week_by_neighborhood: list[WeekNeighborhoodCollections]
+    current_status_breakdown: list[StatusBreakdown]
+    weight_by_month: list[MonthWeight]
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -44,17 +114,15 @@ def get_stats(
     narrow the weekly collection series only."""
     town_id = access.town.id
     active_pdr = (Pdr.town_id == town_id, Pdr.deleted_at.is_(None))
-    # Falls back to stored text for a PDR not yet linked; removed in the contract
-    # phase along with the text columns.
-    neighborhood_name = func.coalesce(Neighborhood.name, Pdr.neighborhood).label("neighborhood")
-    community_name = func.coalesce(Community.name, Pdr.community).label("community")
+    neighborhood_name = Neighborhood.name.label("neighborhood")
+    community_name = Community.name.label("community")
 
     total_pdrs = db.scalar(select(func.count()).select_from(Pdr).where(*active_pdr)) or 0
 
     by_neighborhood = db.execute(
         select(Pdr.neighborhood_id, neighborhood_name, func.count().label("count"))
         .select_from(Pdr)
-        .outerjoin(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
+        .join(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
         .where(*active_pdr)
         .group_by(Pdr.neighborhood_id, neighborhood_name)
         .order_by(func.count().desc())
@@ -63,8 +131,8 @@ def get_stats(
     by_community = db.execute(
         select(Community.id.label("community_id"), community_name, func.count().label("count"))
         .select_from(Pdr)
-        .outerjoin(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
-        .outerjoin(Community, Neighborhood.community_id == Community.id)
+        .join(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
+        .join(Community, Neighborhood.community_id == Community.id)
         .where(*active_pdr)
         .group_by(Community.id, community_name)
         .order_by(func.count().desc())
@@ -112,7 +180,7 @@ def get_stats(
             func.count().filter(Collection.status == "collected").label("collected"),
         )
         .join(Pdr, Pdr.id == Collection.pdr_id)
-        .outerjoin(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
+        .join(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
         .where(*filters)
         .group_by(Collection.year, Collection.week, Pdr.neighborhood_id, neighborhood_name)
         .order_by(Collection.year, Collection.week)

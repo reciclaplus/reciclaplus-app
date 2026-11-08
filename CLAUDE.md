@@ -37,13 +37,16 @@ The one domain term that stays: **PDR** (_Punto de Recogida_ — pickup point). 
 | Collection status | `collected`, `empty`, `unavailable`, `closed`                            |
 | Weight categories | `pet`, `hdpe`, `pp`, `trash` (plastic resin codes)                       |
 | ISO week key      | Collections are keyed by year + ISO week number                          |
+| Town / Proyecto   | A project: one town with its own PDRs, data, settings and members. `town` in code, "Proyecto" in the UI |
 
 ## Roles & Access
 
-Hierarchical roles: `read` < `write` < `admin`. Each inherits the lower role's permissions.
+Roles are **per town** (`town_members`), hierarchical: `read` < `write` < `admin`. Each inherits the lower role's permissions. A user only sees the towns they're a member of.
 
-- Enforce roles **independently** on both frontend (`PermissionGuard` component) and backend (FastAPI dependency per endpoint). Never rely on frontend checks alone.
-- `read`: view list, map, dashboard. `write`: + create/edit PDRs, collection passes, weights. `admin`: + user management, town configuration.
+- `read`: view list, map, dashboard. `write`: + create/edit PDRs, collection passes, weights. `admin`: + the town's members and settings.
+- **Superadmins** (`users.is_superadmin`) act as `admin` in every town and alone can create, archive, restore and delete towns and manage accounts (`/users`).
+- Enforce roles **independently** on both frontend (`PermissionGuard`, using the role in the selected town) and backend (`require_town_role` / `require_superadmin` per endpoint). Never rely on frontend checks alone.
+- Town-owned data is only exposed under `/towns/{town_id}/...`, and every query must filter by the authorized town. Any route not under that prefix must be listed in `UNSCOPED_ROUTES` in `backend/tests/test_town_isolation.py`, which fails otherwise.
 
 ## Architecture Rules
 
@@ -52,13 +55,13 @@ Hierarchical roles: `read` < `write` < `admin`. Each inherits the lower role's p
 - Auth sessions are cookie-based via `@supabase/ssr` — tokens never in `localStorage`. API calls carry `Authorization: Bearer <access_token>` from the Supabase session.
 - Database access is SQLAlchemy only (no `supabase-py` for data) — RLS is deny-all and the backend is the sole data gateway. Schema changes always go through Supabase CLI migrations (SQL files in `supabase/migrations/`).
 - CORS origins are strictly whitelisted per environment — no wildcards in production.
-- All mutating actions (PDR create/update/delete, collection passes, weights, user management) must write to the `activity_logs` audit table.
+- All mutating actions (PDR create/update/delete, collection passes, weights, town config, members, accounts) must write to the `activity_logs` audit table, with their `town_id` (null only for global actions).
 - Supabase is the single source of truth — no external file storage.
 
 ## API Conventions
 
-- RESTful resource routes: `/pdrs`, `/collections`, `/weights`, `/users`, `/towns` (see PRD §5 for the full table).
-- Collections are addressed by week: `/collections/{year}/{week}`.
+- Town-owned resources are nested under the town: `/towns/{town_id}/pdrs`, `/collections`, `/weights`, `/dashboard`, `/members` (see PRD §5 for the full table). Global: `/auth/me`, `/towns`, `/users` (superadmin).
+- Collections are addressed by week: `/towns/{town_id}/collections/{year}/{week}`.
 - FastAPI's auto-generated OpenAPI docs must stay accurate — keep Pydantic models complete and typed.
 
 ## Frontend Conventions

@@ -20,12 +20,13 @@ Version: 1.0 | Date: May 2026
 
 ## 1. Purpose & Overview
 
-ReciclApp is a waste collection management web platform for the Dominican Republic, initially serving Sabana Yegua and surrounding communities. It enables recycling teams to manage pickup points (PDRs — _Puntos de Recogida_), record weekly collection passes, track plastic weight gathered, and visualize recycling impact through a private analytics dashboard.
+ReciclApp is a waste collection management web platform for the Dominican Republic. It serves several projects (_proyectos_), each one town with its own pickup points, data and users; the first is Sabana Yegua and its surrounding communities. It enables recycling teams to manage pickup points (PDRs — _Puntos de Recogida_), record weekly collection passes, track plastic weight gathered, and visualize recycling impact through a private analytics dashboard.
 
 The platform is designed for two audiences:
 
 - **Field operators and coordinators** — log collection activity, register new pickup points, and track weekly weights.
-- **Administrators** — manage users, configure towns and neighborhoods, and oversee the full dataset.
+- **Project administrators** — manage their project's users, and configure its settings, communities and neighborhoods.
+- **Superadmins** — create, archive and delete projects, and manage accounts across all projects.
 
 ---
 
@@ -51,23 +52,27 @@ The platform is designed for two audiences:
 3. Supabase issues a JWT session stored in cookies via `@supabase/ssr`:
    - Access token: 1-hour expiry
    - Refresh token: refreshed automatically by the Supabase client
-4. On each request, the FastAPI backend verifies the Supabase JWT and fetches the user's role from the `users` table.
+4. On each request, the FastAPI backend verifies the Supabase JWT, matches the user in the `users` table by email, and checks their role in the requested town (`town_members`).
 5. Logout is handled by the Supabase client, which clears the session cookies.
 
 ### 3.2 Role-Based Access Control (RBAC)
 
-Roles are hierarchical — each role inherits all permissions of the roles below it.
+Roles apply **per project (town)**: a user can be `write` in one project and `read` in another, and has no access to projects they aren't a member of. Roles are hierarchical — each role inherits all permissions of the roles below it.
 
-| Role    | Access Level                                                                        |
+| Role    | Access Level (within one project)                                                   |
 | ------- | ----------------------------------------------------------------------------------- |
 | `read`  | View pickup points, map, and statistics                                             |
 | `write` | `read` + create/edit pickup points, record collection passes, manage weight entries |
-| `admin` | `write` + user management, town and neighborhood configuration                      |
+| `admin` | `write` + the project's users and settings (communities, neighborhoods, lists)      |
+
+**Superadmins** (`users.is_superadmin`) act as `admin` in every project without a membership, and are the only ones who can create, archive, restore and delete projects, or manage accounts (promote superadmins, deactivate). An archived project blocks everyone until a superadmin restores it.
+
+Users choose their project after signing in: one project goes straight in, several show a picker (and a switcher afterwards), none shows a no-access message.
 
 Role enforcement is applied at two layers:
 
-- **Frontend**: `PermissionGuard` component wraps protected pages and redirects unauthorized users.
-- **Backend**: FastAPI dependency injection enforces role requirements per endpoint.
+- **Frontend**: `PermissionGuard` component wraps protected pages, checks the role in the selected project, and redirects unauthorized users.
+- **Backend**: FastAPI dependencies (`require_town_role`, `require_superadmin`) enforce access per endpoint. A town's data is only reachable through that town's routes.
 
 ---
 
@@ -157,11 +162,13 @@ Records are keyed by ISO week (YYYYWW).
 
 ### 4.10 Admin Panel — `/admin`
 
-**Access:** `admin`  
-Two-tab panel:
+**Access:** `admin` in the selected project  
+Tabs:
 
-- **Users tab**: Create, view, edit, and delete platform users. Assign roles (`read` / `write` / `admin`). Admins cannot delete their own account.
-- **Town Details tab**: Configure towns — name, map center coordinates, categories list, communities with nested barrios.
+- **Users**: the project's members. Add people by email (creating the account if needed), change their role (`read` / `write` / `admin`), or remove them from the project. Admins cannot change or remove their own access.
+- **Project settings**: name, map center and zoom, categories, plastic types, report text, and communities with nested barrios.
+- **Projects** (superadmins only): create, archive, restore and delete projects. Only projects with no data can be deleted.
+- **Accounts** (superadmins only): promote or demote superadmins, deactivate accounts (blocks access to every project). Superadmins cannot change their own superadmin access or deactivate themselves.
 
 ---
 
@@ -175,54 +182,65 @@ Login, logout, and token refresh are handled directly by the Supabase client —
 
 | Method | Endpoint   | Auth Required | Description                                       |
 | ------ | ---------- | ------------- | ------------------------------------------------- |
-| `GET`  | `/auth/me` | JWT           | Return current user's role from the `users` table |
+| `GET`  | `/auth/me` | JWT           | Current user, `is_superadmin`, and their towns with their role in each |
+
+Town-owned data lives under `/towns/{town_id}`. Each role in the tables below is the caller's role **in that town** (superadmins pass as `admin`). An ID from another town is not found.
 
 ### 5.2 Pickup Points (PDRs)
 
-| Method   | Endpoint     | Role    | Description                     |
-| -------- | ------------ | ------- | ------------------------------- |
-| `GET`    | `/pdrs`      | `read`  | List all pickup points          |
-| `GET`    | `/pdrs/{id}` | `read`  | Get a single pickup point       |
-| `POST`   | `/pdrs`      | `write` | Create a new pickup point       |
-| `PUT`    | `/pdrs/{id}` | `write` | Update an existing pickup point |
-| `DELETE` | `/pdrs/{id}` | `write` | Delete a pickup point           |
+| Method   | Endpoint                               | Role    | Description                                   |
+| -------- | -------------------------------------- | ------- | --------------------------------------------- |
+| `GET`    | `/towns/{town_id}/pdrs`                | `read`  | List the town's pickup points                 |
+| `GET`    | `/towns/{town_id}/pdrs/with-history`   | `read`  | Pickup points with their last 5 weeks' status |
+| `GET`    | `/towns/{town_id}/pdrs/{id}`           | `read`  | Get a single pickup point                     |
+| `POST`   | `/towns/{town_id}/pdrs`                | `write` | Create a pickup point (by `neighborhood_id`)  |
+| `PUT`    | `/towns/{town_id}/pdrs/{id}`           | `write` | Update a pickup point                         |
+| `DELETE` | `/towns/{town_id}/pdrs/{id}`           | `write` | Soft-delete a pickup point                    |
 
 ### 5.3 Collections (Recogida)
 
-| Method | Endpoint                     | Role    | Description                                                   |
-| ------ | ---------------------------- | ------- | ------------------------------------------------------------- |
-| `GET`  | `/collections`               | `read`  | Recent collection records (`?limit=n`)                        |
-| `GET`  | `/collections/{year}/{week}` | `read`  | All PDR statuses for a given ISO week                         |
-| `POST` | `/collections/{year}/{week}` | `write` | Save collection pass for a week                               |
-| `GET`  | `/collections/summary`       | `read`  | Historical records by neighborhood (`?group_by=neighborhood`) |
+| Method | Endpoint                                      | Role    | Description                           |
+| ------ | --------------------------------------------- | ------- | ------------------------------------- |
+| `GET`  | `/towns/{town_id}/collections/current`        | `read`  | Current ISO year and week             |
+| `GET`  | `/towns/{town_id}/collections/{year}/{week}`  | `read`  | All PDR statuses for a given ISO week |
+| `POST` | `/towns/{town_id}/collections/{year}/{week}`  | `write` | Save collection pass for a week       |
 
-### 5.4 Weights
+### 5.4 Weights and Dashboard
 
-| Method   | Endpoint        | Role    | Description           |
-| -------- | --------------- | ------- | --------------------- |
-| `GET`    | `/weights`      | `read`  | All weight entries    |
-| `POST`   | `/weights`      | `write` | Create a weight entry |
-| `PUT`    | `/weights/{id}` | `write` | Update a weight entry |
-| `DELETE` | `/weights/{id}` | `write` | Delete a weight entry |
+| Method   | Endpoint                             | Role    | Description                                         |
+| -------- | ------------------------------------ | ------- | --------------------------------------------------- |
+| `GET`    | `/towns/{town_id}/weights`           | `read`  | The town's weight entries                           |
+| `POST`   | `/towns/{town_id}/weights`           | `write` | Create a weight entry (type from the town's list)   |
+| `PUT`    | `/towns/{town_id}/weights/{id}`      | `write` | Update a weight entry                               |
+| `DELETE` | `/towns/{town_id}/weights/{id}`      | `write` | Delete a weight entry                               |
+| `GET`    | `/towns/{town_id}/dashboard/stats`   | `read`  | Dashboard statistics for the town                   |
 
-### 5.5 Users
+### 5.5 Members and Accounts
 
-| Method   | Endpoint         | Role    | Description                        |
-| -------- | ---------------- | ------- | ---------------------------------- |
-| `GET`    | `/users`         | `admin` | List all users                     |
-| `POST`   | `/users`         | `admin` | Create a user                      |
-| `PUT`    | `/users/{email}` | `admin` | Update a user's role or name       |
-| `DELETE` | `/users/{email}` | `admin` | Delete a user (cannot self-delete) |
+| Method   | Endpoint                                | Role         | Description                                                    |
+| -------- | --------------------------------------- | ------------ | -------------------------------------------------------------- |
+| `GET`    | `/towns/{town_id}/members`              | `admin`      | The town's members and roles                                   |
+| `POST`   | `/towns/{town_id}/members`              | `admin`      | Add a user by email (creates the account if needed)            |
+| `PUT`    | `/towns/{town_id}/members/{user_id}`    | `admin`      | Change a member's role (not one's own)                         |
+| `DELETE` | `/towns/{town_id}/members/{user_id}`    | `admin`      | Remove a member from the town (not oneself)                    |
+| `GET`    | `/users`                                | superadmin   | List all accounts                                              |
+| `PUT`    | `/users/{email}`                        | superadmin   | Rename an account or set `is_superadmin`                       |
+| `DELETE` | `/users/{email}`                        | superadmin   | Deactivate an account (not one's own)                          |
 
-### 5.6 Towns
+### 5.6 Towns (Projects)
 
-| Method   | Endpoint      | Role          | Description       |
-| -------- | ------------- | ------------- | ----------------- |
-| `GET`    | `/towns`      | Authenticated | List all towns    |
-| `GET`    | `/towns/{id}` | Authenticated | Get a single town |
-| `POST`   | `/towns`      | `admin`       | Create a town     |
-| `PUT`    | `/towns/{id}` | `admin`       | Update a town     |
-| `DELETE` | `/towns/{id}` | `admin`       | Delete a town     |
+| Method   | Endpoint                                   | Role         | Description                                        |
+| -------- | ------------------------------------------ | ------------ | -------------------------------------------------- |
+| `GET`    | `/towns`                                   | JWT          | The caller's towns (all for superadmins)           |
+| `GET`    | `/towns/{town_id}`                         | `read`       | Town settings with communities and neighborhoods   |
+| `PUT`    | `/towns/{town_id}`                         | `admin`      | Update the town's settings                         |
+| `POST`   | `/towns/{town_id}/communities`             | `admin`      | Add a community                                    |
+| `PUT`    | `/communities/{id}`, `/neighborhoods/{id}` | `admin`      | Rename (authorized against the row's own town)     |
+| `DELETE` | `/communities/{id}`, `/neighborhoods/{id}` | `admin`      | Delete, unless pickup points use it (409)          |
+| `POST`   | `/communities/{id}/neighborhoods`          | `admin`      | Add a neighborhood                                 |
+| `POST`   | `/towns`                                   | superadmin   | Create a town                                      |
+| `POST`   | `/towns/{town_id}/archive`, `/restore`     | superadmin   | Archive or restore a town                          |
+| `DELETE` | `/towns/{town_id}`                         | superadmin   | Delete a town with no data (409 otherwise)         |
 
 ---
 
@@ -232,17 +250,17 @@ PostgreSQL tables (hosted on Supabase):
 
 | Table           | Purpose                           | Key Fields                                                                                       |
 | --------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `pdrs`          | Pickup points                     | `id`, `internal_id`, `name`, `neighborhood`, `community`, `category`, `lat`, `lng`, `created_at` |
-| `collections`   | Weekly collection records         | `id`, `pdr_id` (FK), `year`, `week`, `status` (collected / empty / unavailable / closed), `date` |
-| `weights`       | Weight entries                    | `id`, `pet`, `hdpe`, `pp`, `trash`, `date`                                                       |
-| `users`         | Platform users                    | `id`, `email`, `name`, `role`, `created_at`, `created_by`                                        |
-| `towns`         | Town configuration                | `id`, `name`, `map_center_lat`, `map_center_lng`                                                 |
-| `communities`   | Communities within a town         | `id`, `town_id` (FK), `name`                                                                     |
-| `neighborhoods` | Neighbourhoods within a community | `id`, `community_id` (FK), `name`                                                                |
-| `pdr_logs`      | PDR audit trail                   | `id`, `pdr_id` (FK), `action`, `created_at`                                                      |
-| `activity_logs` | General user activity audit       | `id`, `user_id` (FK), `action`, `resource_type`, `resource_id`, `created_at`                     |
+| `towns`          | Projects and their settings        | `id`, `name`, `map_center_lat`, `map_center_lng`, `map_zoom`, `categories`, `plastic_types`, `report_partner_text`, `archived_at` |
+| `communities`    | Communities within a town          | `id`, `town_id` (FK), `name`                                                                     |
+| `neighborhoods`  | Neighbourhoods within a community  | `id`, `community_id` (FK), `name`                                                                |
+| `pdrs`           | Pickup points                      | `id`, `internal_id`, `name`, `town_id` (FK), `neighborhood_id` (FK), `category`, `lat`, `lng`, `created_at`, `deleted_at` |
+| `collections`    | Weekly collection records          | `id`, `pdr_id` (FK), `year`, `week`, `status` (collected / empty / unavailable / closed), `date` |
+| `weight_entries` | Weight entries                     | `id`, `town_id` (FK), `date`, `plastic_type`, `weight_lbs`                                       |
+| `users`          | Accounts                           | `id`, `email`, `name`, `is_superadmin`, `created_at`, `created_by`, `deleted_at`                 |
+| `town_members`   | A user's role in one town          | `user_id` (FK), `town_id` (FK), `role` (read / write / admin)                                    |
+| `activity_logs`  | Audit trail of mutating actions    | `id`, `user_id` (FK), `town_id` (FK, null for global actions), `action`, `resource_type`, `resource_id`, `resource_name`, `created_at` |
 
-> `users.id` references Supabase Auth's `auth.users` table, linking platform roles to authenticated identities.
+> A PDR's community comes from its neighborhood. Collections belong to a town through their PDR. `users` are matched to Supabase Auth identities by email; they are not linked to `auth.users` by id.
 
 ---
 

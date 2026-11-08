@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -26,15 +26,14 @@ router = APIRouter(prefix="/towns/{town_id}/collections", tags=["collections"])
 def _week_rows(db: Session, town_id: uuid.UUID, year: int, week: int) -> list[CollectionPassRow]:
     """Every active PDR in the town with its status for the ISO week (None if not
     recorded yet)."""
-    community_name = func.coalesce(Community.name, Pdr.community)
     rows = db.execute(
         select(
             Pdr.id,
             Pdr.internal_id,
             Pdr.name,
             Pdr.description,
-            community_name.label("community"),
-            func.coalesce(Neighborhood.name, Pdr.neighborhood).label("neighborhood"),
+            Community.name.label("community"),
+            Neighborhood.name.label("neighborhood"),
             Pdr.neighborhood_id,
             Neighborhood.community_id,
             Pdr.category,
@@ -42,8 +41,8 @@ def _week_rows(db: Session, town_id: uuid.UUID, year: int, week: int) -> list[Co
             Collection.status,
         )
         .select_from(Pdr)
-        .outerjoin(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
-        .outerjoin(Community, Neighborhood.community_id == Community.id)
+        .join(Neighborhood, Pdr.neighborhood_id == Neighborhood.id)
+        .join(Community, Neighborhood.community_id == Community.id)
         .outerjoin(
             Collection,
             and_(
@@ -53,7 +52,7 @@ def _week_rows(db: Session, town_id: uuid.UUID, year: int, week: int) -> list[Co
             ),
         )
         .where(Pdr.town_id == town_id, Pdr.deleted_at.is_(None))
-        .order_by(community_name, Pdr.name)
+        .order_by(Community.name, Pdr.name)
     ).all()
     return [
         CollectionPassRow(

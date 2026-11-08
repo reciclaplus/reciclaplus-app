@@ -1,7 +1,7 @@
 """Auth-related endpoints.
 
 Login/logout/refresh are handled by the Supabase client directly; the backend
-only exposes the current user's identity and role.
+only exposes the current user's identity and their towns.
 """
 
 from fastapi import APIRouter, Depends
@@ -44,7 +44,6 @@ def read_me(
         id=user.id,
         email=user.email,
         name=user.name,
-        role=user.role,
         is_superadmin=user.is_superadmin,
         towns=towns,
     )
