@@ -26,11 +26,22 @@ export interface TownSummary {
   name: string;
   map_center_lat: number;
   map_center_lng: number;
+  map_zoom: number;
+  archived_at: string | null;
 }
 
 export interface TownDetail extends TownSummary {
   categories: string[];
+  plastic_types: string[];
+  report_partner_text: string | null;
   communities: Community[];
+}
+
+/** A town the current user can access, with their role there (from /auth/me). */
+export interface UserTown {
+  id: string;
+  name: string;
+  role: Role;
 }
 
 export interface Pdr {
@@ -44,6 +55,9 @@ export interface Pdr {
   lat: number;
   lng: number;
   created_at: string;
+  town_id: string | null;
+  neighborhood_id: string | null;
+  community_id: string | null;
 }
 
 export interface WeekStatus {

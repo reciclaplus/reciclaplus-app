@@ -25,15 +25,16 @@ import { DataGrid, type GridColDef, type GridColumnVisibilityModel, type GridRen
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { MapPicker, type LatLng } from "@/components/MapPicker";
-import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { neighborhoodLabel, neighborhoodOptions } from "@/lib/locations";
 import { hasRole } from "@/lib/roles";
 import { strings } from "@/lib/strings";
+import { useTown } from "@/lib/town-context";
 import { COLORS } from "@/lib/theme";
 import { ALERT_PILL_COLORS, STATUS_PILL_COLORS } from "@/lib/collection-status";
 import { buildBarrioColorMap, getBarrioColor } from "@/lib/barrio-colors";
 import { formatMondayDate } from "@/lib/week";
-import type { PdrWithHistory, TownDetail, WeekStatus } from "@/lib/types";
+import type { PdrWithHistory, WeekStatus } from "@/lib/types";
 
 const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
 
@@ -86,7 +87,21 @@ function HistoryStrip({ history }: { history: WeekStatus[] }) {
   );
 }
 
+/** The edit dialog's fields. Location is chosen by ID; community only narrows
+ * the barrio dropdown. */
+interface EditDraft {
+  name: string;
+  description: string;
+  category: string;
+  communityId: string;
+  neighborhoodId: string;
+  lat: number;
+  lng: number;
+}
+
 interface PdrRow extends PdrWithHistory {
+  /** Barrio name, plus community when the name repeats in the town. */
+  barrioLabel: string;
   barrioColor: string;
   lastWeekLabel: string;
   lastWeekSort: number;
@@ -106,20 +121,19 @@ function lastRecordedWeek(history: WeekStatus[]): WeekStatus | undefined {
 }
 
 function PdrList() {
-  const { user } = useAuth();
-  const canWrite = user ? hasRole(user.role, "write") : false;
+  const { town, detail, townPath } = useTown();
+  const canWrite = hasRole(town.role, "write");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [pdrs, setPdrs] = useState<PdrWithHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [towns, setTowns] = useState<TownDetail[]>([]);
   const [activeBarrio, setActiveBarrio] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeAlertOnly, setActiveAlertOnly] = useState(false);
   const [editTarget, setEditTarget] = useState<PdrWithHistory | null>(null);
-  const [editDraft, setEditDraft] = useState<Partial<PdrWithHistory>>({});
+  const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PdrWithHistory | null>(null);
   const [columnVisibilityModel, setColumnVisibilityModel] = useState<GridColumnVisibilityModel>({
@@ -138,32 +152,29 @@ function PdrList() {
 
   const load = useCallback(() => {
     setLoading(true);
-    apiFetch<PdrWithHistory[]>("/pdrs/with-history")
+    apiFetch<PdrWithHistory[]>(townPath("/pdrs/with-history"))
       .then(setPdrs)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [townPath]);
 
   useEffect(() => {
     load();
-    apiFetch<TownDetail[]>("/towns").then(async (summaries) => {
-      const details = await Promise.all(
-        summaries.map((t) => apiFetch<TownDetail>(`/towns/${t.id}`)),
-      );
-      setTowns(details);
-    });
   }, [load]);
 
-  const allNeighborhoods = useMemo(
-    () => towns.flatMap((t) => t.communities.flatMap((c) => c.neighborhoods.map((n) => n.name))),
-    [towns],
+  const allNeighborhoods = useMemo(() => neighborhoodOptions(detail), [detail]);
+  const barrioColorMap = useMemo(
+    () => buildBarrioColorMap(allNeighborhoods.map((n) => n.label)),
+    [allNeighborhoods],
   );
-  const barrioColorMap = useMemo(() => buildBarrioColorMap(allNeighborhoods), [allNeighborhoods]);
-  const communityCount = useMemo(() => new Set(pdrs.map((p) => p.community)).size, [pdrs]);
+  const communityCount = useMemo(
+    () => new Set(pdrs.map((p) => p.community_id ?? p.community)).size,
+    [pdrs],
+  );
 
   const filtered = useMemo(() => {
     return pdrs.filter((p) => {
-      const matchesBarrio = !activeBarrio || p.neighborhood === activeBarrio;
+      const matchesBarrio = !activeBarrio || p.neighborhood_id === activeBarrio;
       const matchesCategory = !activeCategory || p.category === activeCategory;
       const matchesAlert = !activeAlertOnly || hasNoCollectionAlert(p);
       return matchesBarrio && matchesCategory && matchesAlert;
@@ -174,16 +185,18 @@ function PdrList() {
     () =>
       filtered.map((p) => {
         const lastWeek = lastRecordedWeek(p.recent_collections);
+        const barrioLabel = neighborhoodLabel(allNeighborhoods, p.neighborhood_id, p.neighborhood);
         return {
           ...p,
-          barrioColor: getBarrioColor(barrioColorMap, p.neighborhood),
+          barrioLabel,
+          barrioColor: getBarrioColor(barrioColorMap, barrioLabel),
           lastWeekLabel: lastWeek ? formatMondayDate(lastWeek) : strings.list.noHistory,
           lastWeekSort: lastWeek ? lastWeek.year * 100 + lastWeek.week : -1,
           lastStatus: lastWeek?.status ?? "",
           noCollectionAlert: hasNoCollectionAlert(p),
         };
       }),
-    [filtered, barrioColorMap],
+    [filtered, barrioColorMap, allNeighborhoods],
   );
 
   function updateBarrio(value: string | null) {
@@ -198,32 +211,49 @@ function PdrList() {
     setEditTarget(pdr);
     setEditDraft({
       name: pdr.name,
-      description: pdr.description,
+      description: pdr.description ?? "",
       category: pdr.category,
-      community: pdr.community,
-      neighborhood: pdr.neighborhood,
+      communityId: pdr.community_id ?? "",
+      neighborhoodId: pdr.neighborhood_id ?? "",
       lat: pdr.lat,
       lng: pdr.lng,
     });
   }
 
-  const editMapCenter = useMemo(() => {
-    const town = towns.find((t) => t.communities.some((c) => c.name === editDraft.community));
-    return town ?? towns[0] ?? null;
-  }, [towns, editDraft.community]);
+  function updateDraft(changes: Partial<EditDraft>) {
+    setEditDraft((d) => (d ? { ...d, ...changes } : d));
+  }
 
-  const editLocation: LatLng | null =
-    editDraft.lat != null && editDraft.lng != null
-      ? { lat: editDraft.lat, lng: editDraft.lng }
-      : null;
+  // The barrio dropdown only offers the chosen community's barrios.
+  const editNeighborhoods = useMemo(
+    () => detail.communities.find((c) => c.id === editDraft?.communityId)?.neighborhoods ?? [],
+    [detail, editDraft?.communityId],
+  );
+  // A PDR can keep a category since removed from the town's list: show it so the
+  // dialog doesn't blank it, while only the current list is offered otherwise.
+  const editCategories = useMemo(() => {
+    const current = editTarget?.category;
+    return current && !detail.categories.includes(current)
+      ? [current, ...detail.categories]
+      : detail.categories;
+  }, [detail, editTarget]);
+
+  const editLocation: LatLng | null = editDraft ? { lat: editDraft.lat, lng: editDraft.lng } : null;
 
   async function saveEdit() {
-    if (!editTarget) return;
+    if (!editTarget || !editDraft) return;
     setSaving(true);
     try {
-      await apiFetch(`/pdrs/${editTarget.id}`, {
+      await apiFetch(townPath(`/pdrs/${editTarget.id}`), {
         method: "PUT",
-        body: JSON.stringify(editDraft),
+        body: JSON.stringify({
+          name: editDraft.name,
+          description: editDraft.description,
+          category: editDraft.category,
+          neighborhood_id: editDraft.neighborhoodId || null,
+          lat: editDraft.lat,
+          lng: editDraft.lng,
+        }),
       });
       setEditTarget(null);
       load();
@@ -234,19 +264,16 @@ function PdrList() {
 
   async function confirmDelete() {
     if (!deleteTarget) return;
-    await apiFetch(`/pdrs/${deleteTarget.id}`, { method: "DELETE" });
+    await apiFetch(townPath(`/pdrs/${deleteTarget.id}`), { method: "DELETE" });
     setDeleteTarget(null);
     setEditTarget(null);
     load();
   }
 
-  const allCommunities = useMemo(
-    () => towns.flatMap((t) => t.communities.map((c) => c.name)),
-    [towns],
-  );
+  // Filter options: the town's categories plus any still used by its PDRs.
   const allCategories = useMemo(
-    () => [...new Set(towns.flatMap((t) => t.categories))],
-    [towns],
+    () => [...new Set([...detail.categories, ...pdrs.map((p) => p.category)])],
+    [detail, pdrs],
   );
 
   const columns: GridColDef<PdrRow>[] = useMemo(
@@ -308,7 +335,7 @@ function PdrList() {
           <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", height: "100%" }}>
             <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: params.row.barrioColor, flexShrink: 0 }} />
             <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, color: COLORS.body }}>
-              {params.row.neighborhood}
+              {params.row.barrioLabel}
             </Typography>
           </Stack>
         ),
@@ -412,7 +439,7 @@ function PdrList() {
         >
           <MenuItem value="">{strings.list.allBarrios}</MenuItem>
           {allNeighborhoods.map((n) => (
-            <MenuItem key={n} value={n}>{n}</MenuItem>
+            <MenuItem key={n.id} value={n.id}>{n.label}</MenuItem>
           ))}
         </TextField>
 
@@ -491,58 +518,59 @@ function PdrList() {
           <Stack spacing={2} sx={{ pt: 1 }}>
             <TextField
               label={strings.list.colName}
-              value={editDraft.name ?? ""}
-              onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+              value={editDraft?.name ?? ""}
+              onChange={(e) => updateDraft({ name: e.target.value })}
               fullWidth
             />
             <TextField
               label={strings.list.colDescription}
-              value={editDraft.description ?? ""}
-              onChange={(e) => setEditDraft((d) => ({ ...d, description: e.target.value }))}
+              value={editDraft?.description ?? ""}
+              onChange={(e) => updateDraft({ description: e.target.value })}
               fullWidth
             />
             <TextField
               select
               label={strings.list.colCategory}
-              value={editDraft.category ?? ""}
-              onChange={(e) => setEditDraft((d) => ({ ...d, category: e.target.value }))}
+              value={editDraft?.category ?? ""}
+              onChange={(e) => updateDraft({ category: e.target.value })}
               fullWidth
             >
-              {allCategories.map((c) => (
+              {editCategories.map((c) => (
                 <MenuItem key={c} value={c}>{c}</MenuItem>
               ))}
             </TextField>
             <TextField
               select
               label={strings.list.colCommunity}
-              value={editDraft.community ?? ""}
-              onChange={(e) => setEditDraft((d) => ({ ...d, community: e.target.value }))}
+              value={editDraft?.communityId ?? ""}
+              onChange={(e) => updateDraft({ communityId: e.target.value, neighborhoodId: "" })}
               fullWidth
             >
-              {allCommunities.map((c) => (
-                <MenuItem key={c} value={c}>{c}</MenuItem>
+              {detail.communities.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
               ))}
             </TextField>
             <TextField
               select
               label={strings.list.colNeighborhood}
-              value={editDraft.neighborhood ?? ""}
-              onChange={(e) => setEditDraft((d) => ({ ...d, neighborhood: e.target.value }))}
+              value={editDraft?.neighborhoodId ?? ""}
+              onChange={(e) => updateDraft({ neighborhoodId: e.target.value })}
+              disabled={!editDraft?.communityId}
               fullWidth
             >
-              {allNeighborhoods.map((n) => (
-                <MenuItem key={n} value={n}>{n}</MenuItem>
+              {editNeighborhoods.map((n) => (
+                <MenuItem key={n.id} value={n.id}>{n.name}</MenuItem>
               ))}
             </TextField>
-            {editMapCenter && (
+            {editDraft && (
               <Box>
                 <Typography sx={{ fontSize: 13, fontWeight: 700, color: COLORS.body, mb: 0.5 }}>
                   {strings.newPdr.location}
                 </Typography>
                 <MapPicker
-                  center={{ lat: editMapCenter.map_center_lat, lng: editMapCenter.map_center_lng }}
+                  center={{ lat: detail.map_center_lat, lng: detail.map_center_lng }}
                   value={editLocation}
-                  onChange={(point) => setEditDraft((d) => ({ ...d, lat: point.lat, lng: point.lng }))}
+                  onChange={(point) => updateDraft({ lat: point.lat, lng: point.lng })}
                   height={240}
                 />
                 <Typography sx={{ fontSize: 12, color: COLORS.muted, mt: 0.5 }}>

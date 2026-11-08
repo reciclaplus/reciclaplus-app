@@ -1,6 +1,6 @@
 /**
- * Role hierarchy — mirrors the backend `require_role` levels in
- * backend/app/auth.py. Frontend checks are for UX only; the backend
+ * Role hierarchy within a town: mirrors the backend `require_town_role` levels
+ * in backend/app/auth.py. Frontend checks are for UX only; the backend
  * enforces access independently.
  */
 export type Role = "read" | "write" | "admin";

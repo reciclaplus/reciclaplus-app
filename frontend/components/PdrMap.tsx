@@ -143,11 +143,14 @@ function BarrioClusteredMarkers({
 
 export function PdrMap({
   center,
+  zoom = 13,
   pdrs,
   height = 540,
   focusedPdr = null,
 }: {
   center: LatLng;
+  /** Initial zoom: the town's configured default. */
+  zoom?: number;
   pdrs: Pdr[];
   height?: number;
   focusedPdr?: Pdr | null;
@@ -180,7 +183,7 @@ export function PdrMap({
         <APIProvider apiKey={API_KEY} libraries={["marker"]}>
           <Map
             defaultCenter={center}
-            defaultZoom={13}
+            defaultZoom={zoom}
             gestureHandling="greedy"
             disableDefaultUI={false}
             mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"}

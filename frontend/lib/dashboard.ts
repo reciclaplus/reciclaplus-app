@@ -3,13 +3,17 @@
  * Used by both the live Dashboard page and the monthly report generator.
  */
 
+import { neighborhoodLabel, type NeighborhoodOption } from "@/lib/locations";
+
 export interface NeighborhoodCount {
   neighborhood: string;
   count: number;
+  neighborhood_id?: string | null;
 }
 export interface CommunityCount {
   community: string;
   count: number;
+  community_id?: string | null;
 }
 export interface CategoryCount {
   category: string;
@@ -29,6 +33,7 @@ export interface WeekNeighborhoodCollections {
   week: number;
   neighborhood: string;
   collected: number;
+  neighborhood_id?: string | null;
 }
 export interface StatusBreakdown {
   status: string;
@@ -49,6 +54,30 @@ export interface DashboardStats {
   collections_by_week_by_neighborhood: WeekNeighborhoodCollections[];
   current_status_breakdown: StatusBreakdown[];
   weight_by_month: MonthWeight[];
+}
+
+/**
+ * Replace barrio names with labels that are unique within the town (adding the
+ * community when a name repeats), matched by barrio ID. Charts and the report
+ * group by these labels, so two same-named barrios stay separate.
+ */
+export function labelStatsNeighborhoods(
+  stats: DashboardStats,
+  options: NeighborhoodOption[],
+): DashboardStats {
+  const label = (id: string | null | undefined, name: string) =>
+    neighborhoodLabel(options, id ?? null, name);
+  return {
+    ...stats,
+    pdrs_by_neighborhood: stats.pdrs_by_neighborhood.map((n) => ({
+      ...n,
+      neighborhood: label(n.neighborhood_id, n.neighborhood),
+    })),
+    collections_by_week_by_neighborhood: stats.collections_by_week_by_neighborhood.map((n) => ({
+      ...n,
+      neighborhood: label(n.neighborhood_id, n.neighborhood),
+    })),
+  };
 }
 
 export const NEIGHBORHOOD_COLORS = [
