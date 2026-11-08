@@ -1,23 +1,30 @@
 "use client";
 
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import LogoutIcon from "@mui/icons-material/Logout";
+import { TownPicker } from "@/components/TownPicker";
 import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { hasRole, type Role } from "@/lib/roles";
 import { strings } from "@/lib/strings";
+import { useTownState } from "@/lib/town-context";
 
 /**
- * Wraps a page and only renders it if the current user meets the minimum role.
- * Redirects unauthenticated users to the landing page; shows a friendly
- * message for authenticated users without sufficient role. Backend enforces
- * access independently — this is UX only.
+ * Wraps a page and only renders it once a town is selected and loaded, and the
+ * user meets the minimum role in that town. Redirects unauthenticated users to
+ * the landing page; shows a dead-end screen to users with no town; asks users
+ * with several towns to pick one. Backend enforces access independently: this
+ * is UX only.
+ *
+ * The page is keyed by town, so switching towns remounts it and every page
+ * reloads its data for the new town.
  */
 export function PermissionGuard({
   minimum,
@@ -27,6 +34,7 @@ export function PermissionGuard({
   children: React.ReactNode;
 }) {
   const { user, loading, status } = useAuth();
+  const { towns, town, detail, detailError, refreshDetail } = useTownState();
   const router = useRouter();
 
   useEffect(() => {
@@ -40,11 +48,7 @@ export function PermissionGuard({
   }, [status, router]);
 
   if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Spinner />;
   }
 
   if (status === "unauthenticated") {
@@ -52,14 +56,43 @@ export function PermissionGuard({
   }
 
   if (status === "unprovisioned") {
-    return <UnprovisionedScreen />;
+    return <DeadEndScreen message={strings.common.notProvisioned} />;
   }
 
   if (!user) {
     return null;
   }
 
-  if (!hasRole(user.role, minimum)) {
+  if (towns.length === 0) {
+    return <DeadEndScreen message={strings.common.noTowns} />;
+  }
+
+  if (!town) {
+    return <TownPicker />;
+  }
+
+  if (detailError) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refreshDetail()}>
+              {strings.common.retry}
+            </Button>
+          }
+        >
+          {strings.common.townLoadError}
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (!detail) {
+    return <Spinner />;
+  }
+
+  if (!hasRole(town.role, minimum)) {
     return (
       <Box sx={{ textAlign: "center", py: 8 }}>
         <Typography color="error">{strings.common.noAccess}</Typography>
@@ -67,16 +100,24 @@ export function PermissionGuard({
     );
   }
 
-  return <>{children}</>;
+  return <Fragment key={town.id}>{children}</Fragment>;
+}
+
+function Spinner() {
+  return (
+    <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+      <CircularProgress />
+    </Box>
+  );
 }
 
 /**
- * Shown to a user with a valid Supabase session whose email has not been
- * provisioned in the platform. It is a dead end (no redirect) so they can read
- * the message and sign out — signing out clears the session and lets them try a
- * different account without getting caught in a redirect loop.
+ * A screen with no way forward but signing out: for a valid Supabase session
+ * whose email isn't provisioned, or a user with no town. No redirect, so they
+ * can read the message, and signing out lets them try another account without a
+ * redirect loop.
  */
-function UnprovisionedScreen() {
+function DeadEndScreen({ message }: { message: string }) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -87,7 +128,7 @@ function UnprovisionedScreen() {
   return (
     <Box sx={{ display: "flex", justifyContent: "center", py: 8, px: 2 }}>
       <Stack spacing={3} sx={{ maxWidth: 420, textAlign: "center", alignItems: "center" }}>
-        <Typography color="text.secondary">{strings.common.notProvisioned}</Typography>
+        <Typography color="text.secondary">{message}</Typography>
         <Button variant="contained" startIcon={<LogoutIcon />} onClick={handleSignOut}>
           {strings.common.signOut}
         </Button>

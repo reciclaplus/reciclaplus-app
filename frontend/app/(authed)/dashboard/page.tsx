@@ -20,7 +20,11 @@ import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-dat
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
+import { neighborhoodOptions } from "@/lib/locations";
+import { plasticTypeLabel } from "@/lib/plastic-types";
+import { useTown } from "@/lib/town-context";
 import {
+  labelStatsNeighborhoods,
   monthLabel,
   monthTitleLabel,
   NEIGHBORHOOD_COLORS,
@@ -107,10 +111,10 @@ function rangeStartDate(range: WeekRange): Date | null {
   return months ? monthsAgo(todayUtc, months) : null;
 }
 
-function buildChartQuery(range: WeekRange, neighborhood: string, category: string): string {
+function buildChartQuery(range: WeekRange, neighborhoodId: string, category: string): string {
   const params = new URLSearchParams();
   if (range !== "all") params.set("range", range);
-  if (neighborhood) params.set("neighborhood", neighborhood);
+  if (neighborhoodId) params.set("neighborhood_id", neighborhoodId);
   if (category) params.set("category", category);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
@@ -170,6 +174,8 @@ function KpiTile({
 }
 
 function Dashboard() {
+  const { town, detail, townPath } = useTown();
+  const barrioOptions = useMemo(() => neighborhoodOptions(detail), [detail]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -211,7 +217,10 @@ function Dashboard() {
     setReportGenerating(true);
     try {
       const [yearStr, monthStr] = reportMonth.split("-");
-      downloadMonthlyReport(stats, pdrs, Number(yearStr), Number(monthStr));
+      downloadMonthlyReport(stats, pdrs, Number(yearStr), Number(monthStr), {
+        name: town.name,
+        partnerText: detail.report_partner_text,
+      });
     } catch {
       setReportError(true);
     } finally {
@@ -220,17 +229,17 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    apiFetch<DashboardStats>("/dashboard/stats")
-      .then(setStats)
+    apiFetch<DashboardStats>(townPath("/dashboard/stats"))
+      .then((data) => setStats(labelStatsNeighborhoods(data, barrioOptions)))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [townPath, barrioOptions]);
 
   useEffect(() => {
-    apiFetch<Pdr[]>("/pdrs")
+    apiFetch<Pdr[]>(townPath("/pdrs"))
       .then(setPdrs)
       .catch(() => setError(true));
-  }, []);
+  }, [townPath]);
 
   const latestPdrs = useMemo(() => {
     const cutoff = Date.now() - addedWithin * 24 * 60 * 60 * 1000;
@@ -239,14 +248,15 @@ function Dashboard() {
 
   useEffect(() => {
     setChartLoading(true);
-    apiFetch<DashboardStats>(`/dashboard/stats${buildChartQuery(rangeFilter, neighborhoodFilter, categoryFilter)}`)
+    apiFetch<DashboardStats>(townPath(`/dashboard/stats${buildChartQuery(rangeFilter, neighborhoodFilter, categoryFilter)}`))
       .then((data) => {
-        setChartWeeks(data.collections_by_week);
-        setChartWeekNeighborhoods(data.collections_by_week_by_neighborhood);
+        const labelled = labelStatsNeighborhoods(data, barrioOptions);
+        setChartWeeks(labelled.collections_by_week);
+        setChartWeekNeighborhoods(labelled.collections_by_week_by_neighborhood);
       })
       .catch(() => setError(true))
       .finally(() => setChartLoading(false));
-  }, [rangeFilter, neighborhoodFilter, categoryFilter]);
+  }, [rangeFilter, neighborhoodFilter, categoryFilter, townPath, barrioOptions]);
 
   const filledChartWeeks = useMemo(() => {
     if (!chartWeeks) return null;
@@ -467,7 +477,7 @@ function Dashboard() {
               >
                 <MenuItem value="">{strings.dashboard.all}</MenuItem>
                 {stats.pdrs_by_neighborhood.map((n) => (
-                  <MenuItem key={n.neighborhood} value={n.neighborhood}>
+                  <MenuItem key={n.neighborhood_id ?? n.neighborhood} value={n.neighborhood_id ?? ""}>
                     {n.neighborhood}
                   </MenuItem>
                 ))}
@@ -541,7 +551,7 @@ function Dashboard() {
               yAxis={[{ label: strings.dashboard.weightLbs }]}
               series={weightByTypeSeries.map((s) => ({
                 data: s.data,
-                label: strings.weights.plasticTypes[s.plastic_type as keyof typeof strings.weights.plasticTypes] ?? s.plastic_type,
+                label: plasticTypeLabel(s.plastic_type),
                 stack: "total",
                 color: s.color,
               }))}

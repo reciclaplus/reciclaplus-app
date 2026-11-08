@@ -9,13 +9,15 @@ import {
 } from "react";
 import { apiFetch } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
-import type { Role } from "@/lib/roles";
+import type { UserTown } from "@/lib/types";
 
+/** The signed-in user. Roles are per town: see `towns` and lib/town-context.tsx. */
 export interface CurrentUser {
   id: string;
   email: string;
   name: string | null;
-  role: Role;
+  is_superadmin: boolean;
+  towns: UserTown[];
 }
 
 /**

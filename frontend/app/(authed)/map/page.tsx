@@ -13,53 +13,34 @@ import { PermissionGuard } from "@/components/PermissionGuard";
 import { PdrMap } from "@/components/PdrMap";
 import type { LatLng } from "@/components/MapPicker";
 import { apiFetch } from "@/lib/api";
+import { neighborhoodOptions } from "@/lib/locations";
 import { strings } from "@/lib/strings";
+import { useTown } from "@/lib/town-context";
 import type { Pdr } from "@/lib/types";
-
-interface TownSummary {
-  id: string;
-  map_center_lat: number;
-  map_center_lng: number;
-}
 
 const ALL = "__all__";
 
 function MapView() {
-  const [center, setCenter] = useState<LatLng | null>(null);
+  const { detail, townPath } = useTown();
   const [pdrs, setPdrs] = useState<Pdr[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [neighborhood, setNeighborhood] = useState(ALL);
+  const [neighborhoodId, setNeighborhoodId] = useState(ALL);
   const [category, setCategory] = useState(ALL);
   const [focusedPdr, setFocusedPdr] = useState<Pdr | null>(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [towns, pdrList] = await Promise.all([
-          apiFetch<TownSummary[]>("/towns"),
-          apiFetch<Pdr[]>("/pdrs"),
-        ]);
-        if (towns.length > 0) {
-          setCenter({
-            lat: towns[0].map_center_lat,
-            lng: towns[0].map_center_lng,
-          });
-        }
-        setPdrs(pdrList);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+    apiFetch<Pdr[]>(townPath("/pdrs"))
+      .then(setPdrs)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [townPath]);
 
-  const neighborhoods = useMemo(
-    () => Array.from(new Set(pdrs.map((p) => p.neighborhood))).sort(),
-    [pdrs],
-  );
+  const center: LatLng = { lat: detail.map_center_lat, lng: detail.map_center_lng };
+  const neighborhoods = useMemo(() => {
+    const used = new Set(pdrs.map((p) => p.neighborhood_id));
+    return neighborhoodOptions(detail).filter((n) => used.has(n.id));
+  }, [detail, pdrs]);
   const categories = useMemo(
     () => Array.from(new Set(pdrs.map((p) => p.category))).sort(),
     [pdrs],
@@ -69,10 +50,10 @@ function MapView() {
     () =>
       pdrs.filter(
         (p) =>
-          (neighborhood === ALL || p.neighborhood === neighborhood) &&
+          (neighborhoodId === ALL || p.neighborhood_id === neighborhoodId) &&
           (category === ALL || p.category === category),
       ),
-    [pdrs, neighborhood, category],
+    [pdrs, neighborhoodId, category],
   );
 
   useEffect(() => {
@@ -85,7 +66,7 @@ function MapView() {
     return <Alert severity="error">{strings.mapPage.loadError}</Alert>;
   }
 
-  if (loading || !center) {
+  if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
         <CircularProgress />
@@ -116,14 +97,14 @@ function MapView() {
           select
           size="small"
           label={strings.mapPage.filterNeighborhood}
-          value={neighborhood}
-          onChange={(e) => setNeighborhood(e.target.value)}
+          value={neighborhoodId}
+          onChange={(e) => setNeighborhoodId(e.target.value)}
           sx={{ minWidth: 200 }}
         >
           <MenuItem value={ALL}>{strings.mapPage.all}</MenuItem>
           {neighborhoods.map((n) => (
-            <MenuItem key={n} value={n}>
-              {n}
+            <MenuItem key={n.id} value={n.id}>
+              {n.label}
             </MenuItem>
           ))}
         </TextField>
@@ -144,7 +125,7 @@ function MapView() {
         </TextField>
       </Stack>
 
-      <PdrMap center={center} pdrs={filtered} focusedPdr={focusedPdr} />
+      <PdrMap center={center} zoom={detail.map_zoom} pdrs={filtered} focusedPdr={focusedPdr} />
     </Stack>
   );
 }

@@ -28,7 +28,17 @@ import { strings } from "@/lib/strings";
 import { type Status, STATUS_COLORS } from "@/lib/collection-status";
 import { type IsoWeek, formatWeekLabel } from "@/lib/week";
 import type { Pdr } from "@/lib/types";
-import { enqueueMark, getOutbox, clearAllOutbox, cacheWeek, getCachedWeek } from "@/lib/route/outbox";
+import {
+  cacheWeek,
+  clearOutbox,
+  enqueueMark,
+  getCachedWeek,
+  getOutbox,
+  groupMarks,
+  marksForTown,
+} from "@/lib/route/outbox";
+import { neighborhoodLabel, neighborhoodOptions } from "@/lib/locations";
+import { useTown } from "@/lib/town-context";
 import { nearestWithinRadius, formatDistance } from "@/lib/geo";
 import { COLORS } from "@/lib/theme";
 
@@ -46,9 +56,16 @@ interface PassRow {
   name: string;
   community: string;
   neighborhood: string;
+  neighborhood_id: string | null;
   category: string;
   route_order: number | null;
   status: Status | null;
+}
+
+/** Barrios are identified by ID, since names can repeat across communities.
+ * A stop not yet linked to a barrio falls back to its name. */
+function barrioKey(s: PassRow): string {
+  return s.neighborhood_id ?? s.neighborhood;
 }
 
 interface RouteStop extends PassRow {
@@ -201,6 +218,8 @@ function MapRefCapture({
 
 function CollectionRoute() {
   const router = useRouter();
+  const { town, detail, townPath } = useTown();
+  const barrioOptions = useMemo(() => neighborhoodOptions(detail), [detail]);
 
   const [week, setWeek] = useState<IsoWeek | null>(null);
   const [allStops, setAllStops] = useState<RouteStop[]>([]);
@@ -232,7 +251,7 @@ function CollectionRoute() {
   const pendingStops = useMemo(
     () =>
       allStops.filter(
-        (s) => s.neighborhood === selectedBarrio && (statuses[s.pdr_id] ?? null) === null,
+        (s) => barrioKey(s) === selectedBarrio && (statuses[s.pdr_id] ?? null) === null,
       ),
     [allStops, selectedBarrio, statuses],
   );
@@ -293,11 +312,11 @@ function CollectionRoute() {
     async function init() {
       try {
         const [w, pdrs] = await Promise.all([
-          apiFetch<IsoWeek>("/collections/current"),
-          apiFetch<Pdr[]>("/pdrs"),
+          apiFetch<IsoWeek>(townPath("/collections/current")),
+          apiFetch<Pdr[]>(townPath("/pdrs")),
         ]);
         setWeek(w);
-        const passRows = await apiFetch<PassRow[]>(`/collections/${w.year}/${w.week}`);
+        const passRows = await apiFetch<PassRow[]>(townPath(`/collections/${w.year}/${w.week}`));
         const pdrMap = new Map(pdrs.map((p) => [p.id, p]));
         const merged: RouteStop[] = passRows
           .filter((r) => pdrMap.has(r.pdr_id))
@@ -306,32 +325,42 @@ function CollectionRoute() {
             return { ...r, lat: pdr.lat, lng: pdr.lng };
           });
 
-        await cacheWeek(w.year, w.week, merged);
+        await cacheWeek(town.id, w.year, w.week, merged);
 
-        // Apply any pending outbox marks on top of server data
+        // Apply this town's pending outbox marks for this week on top of
+        // server data.
         const outbox = await getOutbox();
-        const outboxMap = new Map(outbox.map((m) => [m.pdr_id, m.status]));
+        const outboxMap = new Map(
+          marksForTown(outbox, town.id)
+            .filter((m) => m.year === w.year && m.week === w.week)
+            .map((m) => [m.pdr_id, m.status]),
+        );
 
         setAllStops(merged);
         setStatuses(Object.fromEntries(merged.map((r) => [r.pdr_id, outboxMap.get(r.pdr_id) ?? r.status])));
         setPendingCount(outbox.length);
         if (merged.length > 0) {
-          setSelectedBarrio(merged[0].neighborhood);
+          setSelectedBarrio(barrioKey(merged[0]));
         }
       } catch {
         // Offline fallback: load from IndexedDB cache + outbox
         try {
           const outbox = await getOutbox();
-          if (outbox.length > 0) {
-            const { year, week } = outbox[0];
+          const townMarks = marksForTown(outbox, town.id);
+          if (townMarks.length > 0) {
+            const { year, week } = townMarks[0];
             setWeek({ year, week });
-            const cached = await getCachedWeek(year, week) as RouteStop[] | null;
+            const cached = await getCachedWeek(town.id, year, week) as RouteStop[] | null;
             if (cached) {
-              const outboxMap = new Map(outbox.map((m) => [m.pdr_id, m.status]));
+              const outboxMap = new Map(
+                townMarks
+                  .filter((m) => m.year === year && m.week === week)
+                  .map((m) => [m.pdr_id, m.status]),
+              );
               setAllStops(cached);
               setStatuses(Object.fromEntries(cached.map((r) => [r.pdr_id, outboxMap.get(r.pdr_id) ?? r.status])));
               setPendingCount(outbox.length);
-              if (cached.length > 0) setSelectedBarrio(cached[0].neighborhood);
+              if (cached.length > 0) setSelectedBarrio(barrioKey(cached[0]));
             } else {
               setError(true);
             }
@@ -346,7 +375,7 @@ function CollectionRoute() {
       }
     }
     init();
-  }, []);
+  }, [town.id, townPath]);
 
   // Derived state
   const barrios = useMemo(() => {
@@ -354,14 +383,25 @@ function CollectionRoute() {
     return allStops
       .sort((a, b) => sortKey(a) - sortKey(b))
       .reduce<string[]>((acc, s) => {
-        if (!seen.has(s.neighborhood)) { seen.add(s.neighborhood); acc.push(s.neighborhood); }
+        const key = barrioKey(s);
+        if (!seen.has(key)) { seen.add(key); acc.push(key); }
         return acc;
       }, []);
   }, [allStops]);
 
+  // Display names for barrio keys, adding the community when a name repeats.
+  const barrioLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const s of allStops) {
+      labels.set(barrioKey(s), neighborhoodLabel(barrioOptions, s.neighborhood_id, s.neighborhood));
+    }
+    return labels;
+  }, [allStops, barrioOptions]);
+  const barrioName = (key: string) => barrioLabels.get(key) ?? key;
+
   const stops = useMemo(() =>
     allStops
-      .filter((s) => s.neighborhood === selectedBarrio)
+      .filter((s) => barrioKey(s) === selectedBarrio)
       .sort((a, b) => sortKey(a) - sortKey(b))
       .map((s) => ({ ...s, status: statuses[s.pdr_id] ?? null })),
     [allStops, selectedBarrio, statuses],
@@ -401,11 +441,11 @@ function CollectionRoute() {
   function goToNearby() {
     if (!nearbySuggestion) return;
     const { stop } = nearbySuggestion;
-    if (stop.neighborhood !== selectedBarrio) {
+    if (barrioKey(stop) !== selectedBarrio) {
       // Switching barrio recomputes `stops`, which would otherwise make the
       // auto-select effect override this pick with the barrio's first pending.
       desiredIdRef.current = stop.pdr_id;
-      setSelectedBarrio(stop.neighborhood);
+      setSelectedBarrio(barrioKey(stop));
     }
     setCurrentId(stop.pdr_id);
   }
@@ -415,7 +455,7 @@ function CollectionRoute() {
     if (!week) return;
     const now = new Date().toISOString();
     setStatuses((prev) => ({ ...prev, [pdr_id]: status }));
-    enqueueMark({ pdr_id, status, collected_at: now, year: week.year, week: week.week })
+    enqueueMark({ pdr_id, status, collected_at: now, year: week.year, week: week.week, town_id: town.id })
       .then(() => setPendingCount((c) => c + 1));
 
     // Auto-advance to next pending
@@ -424,30 +464,36 @@ function CollectionRoute() {
     if (next) setCurrentId(next.pdr_id);
   }
 
-  // Sync: flush IndexedDB outbox to server
+  // Sync: flush the IndexedDB outbox to the server. Each mark is saved to its
+  // own town and week, even if the operator has moved on to another week or
+  // town, and only the groups that save are removed, so a failure retries later.
   const flush = useCallback(async () => {
-    if (!week) return;
     const outbox = await getOutbox();
     if (outbox.length === 0) return;
     setSyncing(true);
     try {
-      const entries = outbox.map((p) => ({
-        pdr_id: p.pdr_id,
-        status: p.status,
-        collected_at: p.collected_at,
-      }));
-      await apiFetch(`/collections/${week.year}/${week.week}`, {
-        method: "POST",
-        body: JSON.stringify({ entries }),
-      });
-      await clearAllOutbox();
-      setPendingCount(0);
-    } catch {
-      // keep in outbox, will retry
+      for (const group of groupMarks(outbox, town.id)) {
+        try {
+          await apiFetch(`/towns/${group.townId}/collections/${group.year}/${group.week}`, {
+            method: "POST",
+            body: JSON.stringify({
+              entries: group.marks.map((m) => ({
+                pdr_id: m.pdr_id,
+                status: m.status,
+                collected_at: m.collected_at,
+              })),
+            }),
+          });
+          await clearOutbox(group.marks.map((m) => m.pdr_id));
+        } catch {
+          // Kept in the outbox; retried on the next flush.
+        }
+      }
+      setPendingCount((await getOutbox()).length);
     } finally {
       setSyncing(false);
     }
-  }, [week]);
+  }, [town.id]);
 
   // Auto-flush on a timer + on reconnect
   useEffect(() => {
@@ -468,11 +514,11 @@ function CollectionRoute() {
   }
 
   const mapCenter = useMemo(() => {
-    if (stops.length === 0) return { lat: 18.45, lng: -71.07 };
+    if (stops.length === 0) return { lat: detail.map_center_lat, lng: detail.map_center_lng };
     const lat = stops.reduce((s, p) => s + p.lat, 0) / stops.length;
     const lng = stops.reduce((s, p) => s + p.lng, 0) / stops.length;
     return { lat, lng };
-  }, [stops]);
+  }, [stops, detail]);
 
   const allDone = stops.length > 0 && markedCount === stops.length;
   const hasNextBarrio = barrios.indexOf(selectedBarrio) < barrios.length - 1;
@@ -598,12 +644,12 @@ function CollectionRoute() {
               }}
             >
               {barrios.map((b) => (
-                <option key={b} value={b}>{b}</option>
+                <option key={b} value={b}>{barrioName(b)}</option>
               ))}
             </select>
           )}
           {barrios.length === 1 && (
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{selectedBarrio}</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{barrioName(selectedBarrio)}</Typography>
           )}
           <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
             {collectedCount} {strings.collectionRoute.collectedCount} · {markedCount}/{stops.length} {strings.collectionRoute.progress}
@@ -645,9 +691,9 @@ function CollectionRoute() {
               <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
                 {nearbySuggestion.stop.name}
               </Typography>
-              {nearbySuggestion.stop.neighborhood !== selectedBarrio && (
+              {barrioKey(nearbySuggestion.stop) !== selectedBarrio && (
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
-                  {nearbySuggestion.stop.neighborhood}
+                  {barrioName(barrioKey(nearbySuggestion.stop))}
                 </Typography>
               )}
             </Box>
@@ -660,11 +706,11 @@ function CollectionRoute() {
         {allDone ? (
           <Box sx={{ textAlign: "center", py: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              ¡{selectedBarrio} {strings.collectionRoute.barrioComplete}!
+              ¡{barrioName(selectedBarrio)} {strings.collectionRoute.barrioComplete}!
             </Typography>
             {hasNextBarrio && (
               <Button variant="contained" onClick={goNextBarrio}>
-                {strings.collectionRoute.nextBarrio} · {barrios[barrios.indexOf(selectedBarrio) + 1]}
+                {strings.collectionRoute.nextBarrio} · {barrioName(barrios[barrios.indexOf(selectedBarrio) + 1])}
               </Button>
             )}
             {!hasNextBarrio && (

@@ -24,11 +24,13 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import RecyclingIcon from "@mui/icons-material/Recycling";
 import ScaleIcon from "@mui/icons-material/Scale";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { hasRole, type Role } from "@/lib/roles";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
+import { useTownState } from "@/lib/town-context";
 
 const SIDEBAR_WIDTH = 236;
 
@@ -93,21 +95,48 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
 }
 
 /**
+ * The selected town, with a button to switch when the user has several. Shown
+ * in the sidebar, so also in the mobile drawer.
+ */
+function TownBlock({ onSwitch }: { onSwitch: () => void }) {
+  const { towns, town } = useTownState();
+  if (!town) return null;
+  return (
+    <Box sx={{ bgcolor: "rgba(255,255,255,.12)", borderRadius: "12px", px: 1.5, py: 1, mt: 0.5 }}>
+      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,.7)", textTransform: "uppercase", letterSpacing: ".04em" }}>
+        {strings.towns.current}
+      </Typography>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 0.5 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#fff", flexGrow: 1, minWidth: 0 }} noWrap>
+          {town.name}
+        </Typography>
+        {towns.length > 1 && (
+          <IconButton size="small" onClick={onSwitch} aria-label={strings.towns.switch} title={strings.towns.switch} sx={{ color: "rgba(255,255,255,.85)" }}>
+            <SwapHorizIcon fontSize="small" />
+          </IconButton>
+        )}
+      </Stack>
+    </Box>
+  );
+}
+
+/**
  * App shell for authenticated pages: a persistent emerald sidebar nav on
- * desktop (>=900px), a bottom tab bar on mobile, role-filtered links, and a
- * user card with sign-out.
+ * desktop (>=900px), a bottom tab bar on mobile, links filtered by the role in
+ * the selected town, and a user card with sign-out.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { towns, town, clearTown } = useTownState();
   const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const items = NAV_ITEMS.filter((item) => hasRole(user?.role, item.minimum));
-  const secondaryItems = NAV_ITEMS_SECONDARY.filter((item) => hasRole(user?.role, item.minimum));
-  const mobileTabs = MOBILE_TABS.filter((item) => hasRole(user?.role, item.minimum));
+  const items = NAV_ITEMS.filter((item) => hasRole(town?.role, item.minimum));
+  const secondaryItems = NAV_ITEMS_SECONDARY.filter((item) => hasRole(town?.role, item.minimum));
+  const mobileTabs = MOBILE_TABS.filter((item) => hasRole(town?.role, item.minimum));
 
   // The in-progress collection route is a full-screen, immersive view with its
   // own back button and bottom controls — it must fill the exact viewport
@@ -146,6 +175,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Typography>
       </Stack>
 
+      <TownBlock
+        onSwitch={() => {
+          onNavigate?.();
+          clearTown();
+        }}
+      />
+
       <Stack spacing={0.5} sx={{ mt: 1, flexGrow: 1, overflowY: "auto" }}>
         {items.map((item) => (
           <NavLink key={item.href} item={item} active={pathname === item.href} onClick={onNavigate} />
@@ -178,9 +214,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Typography noWrap sx={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
               {user.name ?? user.email}
             </Typography>
-            <Typography noWrap sx={{ fontSize: 11.5, color: "rgba(255,255,255,.7)" }}>
-              {strings.roles[user.role]}
-            </Typography>
+            {town && (
+              <Typography noWrap sx={{ fontSize: 11.5, color: "rgba(255,255,255,.7)" }}>
+                {strings.roles[town.role]}
+              </Typography>
+            )}
           </Box>
           <IconButton size="small" onClick={handleSignOut} aria-label={strings.nav.signOut} sx={{ color: "rgba(255,255,255,.85)" }}>
             <LogoutIcon fontSize="small" />
@@ -222,6 +260,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             : { p: { xs: 2, sm: 3, md: 4 }, pb: { xs: 10, md: 4 } }),
         }}
       >
+        {/* On phones the sidebar is hidden in the drawer, so a user with several
+            towns always sees which one they're in. */}
+        {!isDesktop && !isFullBleed && town && towns.length > 1 && (
+          <Box
+            component="button"
+            onClick={clearTown}
+            aria-label={strings.towns.switch}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              width: "100%",
+              mb: 2,
+              px: 1.5,
+              py: 0.75,
+              minHeight: 40,
+              border: "none",
+              borderRadius: "10px",
+              bgcolor: COLORS.emeraldEnd,
+              color: "#fff",
+              cursor: "pointer",
+              textAlign: "left",
+              font: "inherit",
+            }}
+          >
+            <Typography component="span" sx={{ fontSize: 13, fontWeight: 800, flexGrow: 1, minWidth: 0 }} noWrap>
+              {town.name}
+            </Typography>
+            <SwapHorizIcon fontSize="small" />
+          </Box>
+        )}
         {children}
       </Box>
 

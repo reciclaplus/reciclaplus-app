@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -19,7 +19,9 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import RouteIcon from "@mui/icons-material/Route";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
+import { neighborhoodLabel, neighborhoodOptions } from "@/lib/locations";
 import { strings } from "@/lib/strings";
+import { useTown } from "@/lib/town-context";
 import { type Status, STATUSES, STATUS_COLORS } from "@/lib/collection-status";
 import { type IsoWeek, shiftWeek, formatWeekLabel } from "@/lib/week";
 
@@ -29,9 +31,16 @@ interface PassRow {
   name: string;
   community: string;
   neighborhood: string;
+  neighborhood_id: string | null;
+  community_id: string | null;
   category: string;
   status: Status | null;
 }
+
+/** Filter keys are IDs: names can repeat across communities. Rows not yet
+ * linked to a barrio fall back to their name. */
+const communityKey = (r: PassRow) => r.community_id ?? r.community;
+const neighborhoodKey = (r: PassRow) => r.neighborhood_id ?? r.neighborhood;
 
 function StatusPicker({
   value,
@@ -76,6 +85,8 @@ function StatusPicker({
 }
 
 function CollectionPass() {
+  const { detail, townPath } = useTown();
+  const barrioOptions = useMemo(() => neighborhoodOptions(detail), [detail]);
   const [week, setWeek] = useState<IsoWeek | null>(null);
   const [currentWeek, setCurrentWeek] = useState<IsoWeek | null>(null);
   const [rows, setRows] = useState<PassRow[]>([]);
@@ -87,24 +98,31 @@ function CollectionPass() {
   const [filterCommunity, setFilterCommunity] = useState("");
   const [filterNeighborhood, setFilterNeighborhood] = useState("");
 
-  const communities = [...new Set(rows.map((r) => r.community))].sort();
+  const communities = [...new Map(rows.map((r) => [communityKey(r), r.community])).entries()]
+    .map(([key, name]) => ({ key, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
   const neighborhoods = [
-    ...new Set(
+    ...new Map(
       rows
-        .filter((r) => !filterCommunity || r.community === filterCommunity)
-        .map((r) => r.neighborhood),
-    ),
-  ].sort();
+        .filter((r) => !filterCommunity || communityKey(r) === filterCommunity)
+        .map((r) => [
+          neighborhoodKey(r),
+          neighborhoodLabel(barrioOptions, r.neighborhood_id, r.neighborhood),
+        ]),
+    ).entries(),
+  ]
+    .map(([key, label]) => ({ key, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "es"));
 
   const visibleRows = filterNeighborhood
-    ? rows.filter((r) => r.neighborhood === filterNeighborhood)
+    ? rows.filter((r) => neighborhoodKey(r) === filterNeighborhood)
     : [];
 
   const loadWeek = useCallback(async (w: IsoWeek) => {
     setLoading(true);
     setError(false);
     try {
-      const data = await apiFetch<PassRow[]>(`/collections/${w.year}/${w.week}`);
+      const data = await apiFetch<PassRow[]>(townPath(`/collections/${w.year}/${w.week}`));
       setRows(data);
       setStatuses(Object.fromEntries(data.map((r) => [r.pdr_id, r.status ?? ""])));
     } catch {
@@ -112,12 +130,12 @@ function CollectionPass() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [townPath]);
 
   useEffect(() => {
     async function init() {
       try {
-        const w = await apiFetch<IsoWeek>("/collections/current");
+        const w = await apiFetch<IsoWeek>(townPath("/collections/current"));
         setWeek(w);
         setCurrentWeek(w);
         await loadWeek(w);
@@ -127,7 +145,7 @@ function CollectionPass() {
       }
     }
     init();
-  }, [loadWeek]);
+  }, [loadWeek, townPath]);
 
   function goToWeek(delta: number) {
     if (!week) return;
@@ -144,7 +162,7 @@ function CollectionPass() {
     setSaving(true);
     try {
       const updated = await apiFetch<PassRow[]>(
-        `/collections/${week.year}/${week.week}`,
+        townPath(`/collections/${week.year}/${week.week}`),
         { method: "POST", body: JSON.stringify({ entries }) },
       );
       setRows(updated);
@@ -219,7 +237,7 @@ function CollectionPass() {
           >
             <MenuItem value="">{strings.collectionPass.all}</MenuItem>
             {communities.map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
+              <MenuItem key={c.key} value={c.key}>{c.name}</MenuItem>
             ))}
           </TextField>
           <TextField
@@ -232,7 +250,7 @@ function CollectionPass() {
           >
             <MenuItem value="">{strings.collectionPass.all}</MenuItem>
             {neighborhoods.map((n) => (
-              <MenuItem key={n} value={n}>{n}</MenuItem>
+              <MenuItem key={n.key} value={n.key}>{n.label}</MenuItem>
             ))}
           </TextField>
         </Box>

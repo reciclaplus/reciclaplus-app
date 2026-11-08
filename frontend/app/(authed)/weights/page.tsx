@@ -24,18 +24,18 @@ import {
 import { esES } from "@mui/x-data-grid/locales";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
+import { plasticTypeLabel } from "@/lib/plastic-types";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
+import { useTown } from "@/lib/town-context";
 
 const gridLocaleText = esES.components.MuiDataGrid.defaultProps.localeText;
-
-const PLASTIC_TYPES = ["pet", "hdpe", "pp", "trash"] as const;
-type PlasticType = (typeof PLASTIC_TYPES)[number];
 
 interface WeightEntry {
   id: string;
   date: string;
-  plastic_type: PlasticType;
+  /** May be a type since removed from the town's list. */
+  plastic_type: string;
   weight_lbs: number;
   created_at: string;
 }
@@ -61,8 +61,11 @@ function todayISO(): string {
 }
 
 function WeightsForm() {
+  const { detail, townPath } = useTown();
+  // Only the town's current types can be chosen for new entries.
+  const plasticTypes = detail.plastic_types;
   const [date, setDate] = useState(todayISO());
-  const [plasticType, setPlasticType] = useState<PlasticType>("pet");
+  const [plasticType, setPlasticType] = useState(plasticTypes[0] ?? "");
   const [weightLbs, setWeightLbs] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -90,7 +93,11 @@ function WeightsForm() {
         width: 160,
         type: "singleSelect",
         editable: true,
-        valueOptions: PLASTIC_TYPES.map((t) => ({ value: t, label: strings.weights.plasticTypes[t] })),
+        // Includes types in use on existing entries, so a removed type still
+        // shows its label; choosing it again is rejected by the backend.
+        valueOptions: Array.from(new Set([...plasticTypes, ...entries.map((e) => e.plastic_type)])).map(
+          (t) => ({ value: t, label: plasticTypeLabel(t) }),
+        ),
       },
       {
         field: "weight_lbs",
@@ -114,12 +121,12 @@ function WeightsForm() {
         ],
       },
     ],
-    [],
+    [plasticTypes, entries],
   );
 
   async function loadEntries() {
     try {
-      const data = await apiFetch<WeightEntry[]>("/weights");
+      const data = await apiFetch<WeightEntry[]>(townPath("/weights"));
       setEntries(data);
     } catch {
       setLoadError(true);
@@ -130,7 +137,7 @@ function WeightsForm() {
 
   async function processRowUpdate(newRow: WeightEntry, oldRow: WeightEntry): Promise<WeightEntry> {
     try {
-      const updated = await apiFetch<WeightEntry>(`/weights/${newRow.id}`, {
+      const updated = await apiFetch<WeightEntry>(townPath(`/weights/${newRow.id}`), {
         method: "PUT",
         body: JSON.stringify({
           date: newRow.date,
@@ -149,7 +156,7 @@ function WeightsForm() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await apiFetch(`/weights/${deleteTarget}`, { method: "DELETE" });
+      await apiFetch(townPath(`/weights/${deleteTarget}`), { method: "DELETE" });
       setEntries((prev) => prev.filter((e) => e.id !== deleteTarget));
     } catch {
       setToast({ ok: false, msg: strings.weights.deleteError });
@@ -160,6 +167,8 @@ function WeightsForm() {
 
   useEffect(() => {
     loadEntries();
+    // Runs once: the page remounts when the town changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canSubmit = date && plasticType && weightLbs && Number(weightLbs) > 0 && !submitting;
@@ -169,7 +178,7 @@ function WeightsForm() {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const created = await apiFetch<WeightEntry>("/weights", {
+      const created = await apiFetch<WeightEntry>(townPath("/weights"), {
         method: "POST",
         body: JSON.stringify({
           date,
@@ -261,13 +270,13 @@ function WeightsForm() {
                   select
                   label={strings.weights.plasticType}
                   value={plasticType}
-                  onChange={(e) => setPlasticType(e.target.value as PlasticType)}
+                  onChange={(e) => setPlasticType(e.target.value)}
                   required
                   fullWidth
                 >
-                  {PLASTIC_TYPES.map((t) => (
+                  {plasticTypes.map((t) => (
                     <MenuItem key={t} value={t}>
-                      {strings.weights.plasticTypes[t]}
+                      {plasticTypeLabel(t)}
                     </MenuItem>
                   ))}
                 </TextField>

@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
+import { useTown } from "@/lib/town-context";
 import type { IsoWeek } from "@/lib/week";
 import type { Status } from "@/lib/collection-status";
 
@@ -137,20 +138,21 @@ function QuickLinkCard({
 
 function HomeContent() {
   const { user, loading } = useAuth();
+  const { town, townPath } = useTown();
   const [week, setWeek] = useState<IsoWeek | null>(null);
   const [rows, setRows] = useState<CollectionPassRow[] | null>(null);
 
   useEffect(() => {
-    apiFetch<IsoWeek>("/collections/current")
+    apiFetch<IsoWeek>(townPath("/collections/current"))
       .then((w) => {
         setWeek(w);
-        return apiFetch<CollectionPassRow[]>(`/collections/${w.year}/${w.week}`);
+        return apiFetch<CollectionPassRow[]>(townPath(`/collections/${w.year}/${w.week}`));
       })
       .then(setRows)
       .catch(() => {
         setRows([]);
       });
-  }, []);
+  }, [townPath]);
 
   const { recorded, total, percent } = useMemo(() => {
     if (!rows) return { recorded: 0, total: 0, percent: 0 };
@@ -190,11 +192,12 @@ function HomeContent() {
           <Typography sx={{ fontSize: 14.5, fontWeight: 600, color: COLORS.body, mt: 0.5 }}>
             {todayCapitalized}
             {week ? ` · ${strings.collectionPass.week} ${week.week}` : ""}
+            {` · ${town.name}`}
           </Typography>
         </Box>
         {user && (
           <Chip
-            label={`${strings.home.role}: ${strings.roles[user.role]}`}
+            label={`${strings.home.role}: ${strings.roles[town.role]}`}
             sx={{
               bgcolor: COLORS.roleBadgeBg,
               color: "#9a5f10",

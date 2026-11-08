@@ -12,6 +12,7 @@ import {
   type DashboardStats,
   type WeekCollections,
 } from "@/lib/dashboard";
+import { plasticTypeLabel } from "@/lib/plastic-types";
 import { strings } from "@/lib/strings";
 import { COLORS } from "@/lib/theme";
 import type { Pdr } from "@/lib/types";
@@ -69,12 +70,30 @@ export interface MonthlyReportOptions {
   year: number;
   month: number;
   generatedOn: Date;
+  town: ReportTown;
+}
+
+/** The town a report covers, shown in its header and file name. */
+export interface ReportTown {
+  name: string;
+  /** Optional line set in the town's settings, e.g. a partner organization. */
+  partnerText: string | null;
+}
+
+/** A file-name-safe form of a town name: "Sabana Yegua" -> "sabana-yegua". */
+function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export function generateMonthlyReportHtml(
   stats: DashboardStats,
   pdrs: Pdr[],
-  { year, month, generatedOn }: MonthlyReportOptions
+  { year, month, generatedOn, town }: MonthlyReportOptions
 ): string {
   const s = strings.report;
   const monthTitle = monthTitleLabel(year, month);
@@ -212,7 +231,7 @@ export function generateMonthlyReportHtml(
         .map((t) => {
           const cur = Math.round(weightRowsThisMonth.find((m) => m.plastic_type === t)?.weight_lbs ?? 0);
           const prv = Math.round(weightRowsPrevMonth.find((m) => m.plastic_type === t)?.weight_lbs ?? 0);
-          const label = strings.weights.plasticTypes[t as keyof typeof strings.weights.plasticTypes] ?? t;
+          const label = plasticTypeLabel(t);
           return `<div style="width:45px;font-size:11px;font-weight:700;color:${COLORS.ink};text-align:center;">${esc(label)}<div style="font-size:10px;font-weight:600;color:${COLORS.muted};">${prv}/${cur}</div></div>`;
         })
         .join("")}
@@ -276,7 +295,8 @@ export function generateMonthlyReportHtml(
         <span class="rp-font-display" style="font-size:13px;font-weight:800;color:${COLORS.emeraldEnd};text-transform:uppercase;letter-spacing:0.06em;">${esc(s.brand)}</span>
       </div>
       <h1 class="rp-font-display" style="font-size:26px;font-weight:800;color:${COLORS.ink};margin:0;">${esc(s.title)}</h1>
-      <div style="font-size:13px;font-weight:600;color:${COLORS.mutedAlt};margin-top:4px;">${esc(monthTitle)}</div>
+      <div style="font-size:13px;font-weight:600;color:${COLORS.mutedAlt};margin-top:4px;">${esc(town.name)} · ${esc(monthTitle)}</div>
+      ${town.partnerText ? `<div style="font-size:12px;font-weight:600;color:${COLORS.muted};margin-top:2px;">${esc(town.partnerText)}</div>` : ""}
     </div>
     <div style="text-align:right;font-size:11px;color:${COLORS.muted};font-weight:600;">
       Generado el ${esc(dateStr)}<br>${esc(s.internalUse)}
@@ -322,13 +342,19 @@ export function generateMonthlyReportHtml(
 }
 
 /** Triggers a browser download of the generated report as an .html file. */
-export function downloadMonthlyReport(stats: DashboardStats, pdrs: Pdr[], year: number, month: number): void {
-  const html = generateMonthlyReportHtml(stats, pdrs, { year, month, generatedOn: new Date() });
+export function downloadMonthlyReport(
+  stats: DashboardStats,
+  pdrs: Pdr[],
+  year: number,
+  month: number,
+  town: ReportTown,
+): void {
+  const html = generateMonthlyReportHtml(stats, pdrs, { year, month, generatedOn: new Date(), town });
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `informe-reciclaje-${year}-${String(month).padStart(2, "0")}.html`;
+  a.download = `informe-reciclaje-${slugify(town.name) || "proyecto"}-${year}-${String(month).padStart(2, "0")}.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

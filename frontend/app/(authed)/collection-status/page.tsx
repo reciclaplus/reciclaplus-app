@@ -18,7 +18,9 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { PermissionGuard } from "@/components/PermissionGuard";
 import { apiFetch } from "@/lib/api";
+import { neighborhoodLabel, neighborhoodOptions } from "@/lib/locations";
 import { strings } from "@/lib/strings";
+import { useTown } from "@/lib/town-context";
 import { type Status, STATUS_PILL_COLORS } from "@/lib/collection-status";
 import { type IsoWeek, shiftWeek, formatWeekLabel } from "@/lib/week";
 
@@ -27,6 +29,7 @@ interface StatusRow {
   name: string;
   description: string | null;
   neighborhood: string;
+  neighborhood_id: string | null;
   status: Status | null;
 }
 
@@ -92,6 +95,7 @@ function NeighborhoodAccordion({ neighborhood, rows }: { neighborhood: string; r
 }
 
 function CollectionStatus() {
+  const { detail, townPath } = useTown();
   const [week, setWeek] = useState<IsoWeek | null>(null);
   const [currentWeek, setCurrentWeek] = useState<IsoWeek | null>(null);
   const [rows, setRows] = useState<StatusRow[]>([]);
@@ -102,19 +106,19 @@ function CollectionStatus() {
     setLoading(true);
     setError(false);
     try {
-      const data = await apiFetch<StatusRow[]>(`/collections/${w.year}/${w.week}`);
+      const data = await apiFetch<StatusRow[]>(townPath(`/collections/${w.year}/${w.week}`));
       setRows(data);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [townPath]);
 
   useEffect(() => {
     async function init() {
       try {
-        const w = await apiFetch<IsoWeek>("/collections/current");
+        const w = await apiFetch<IsoWeek>(townPath("/collections/current"));
         setWeek(w);
         setCurrentWeek(w);
         await loadWeek(w);
@@ -124,7 +128,7 @@ function CollectionStatus() {
       }
     }
     init();
-  }, [loadWeek]);
+  }, [loadWeek, townPath]);
 
   function goToWeek(delta: number) {
     if (!week) return;
@@ -133,17 +137,23 @@ function CollectionStatus() {
     loadWeek(next);
   }
 
+  // Grouped by barrio ID: two communities can have a barrio with the same name.
   const neighborhoods = useMemo(() => {
-    const byNeighborhood = new Map<string, StatusRow[]>();
+    const options = neighborhoodOptions(detail);
+    const byNeighborhood = new Map<string, { neighborhood: string; rows: StatusRow[] }>();
     for (const row of rows) {
-      const list = byNeighborhood.get(row.neighborhood) ?? [];
-      list.push(row);
-      byNeighborhood.set(row.neighborhood, list);
+      const key = row.neighborhood_id ?? row.neighborhood;
+      const group = byNeighborhood.get(key) ?? {
+        neighborhood: neighborhoodLabel(options, row.neighborhood_id, row.neighborhood),
+        rows: [],
+      };
+      group.rows.push(row);
+      byNeighborhood.set(key, group);
     }
     return Array.from(byNeighborhood.entries())
-      .map(([neighborhood, rows]) => ({ neighborhood, rows }))
-      .sort((a, b) => a.neighborhood.localeCompare(b.neighborhood));
-  }, [rows]);
+      .map(([key, group]) => ({ key, ...group }))
+      .sort((a, b) => a.neighborhood.localeCompare(b.neighborhood, "es"));
+  }, [rows, detail]);
 
   if (error) {
     return <Alert severity="error">{strings.collectionStatus.loadError}</Alert>;
@@ -187,8 +197,8 @@ function CollectionStatus() {
         <Alert severity="info">{strings.collectionStatus.empty}</Alert>
       ) : (
         <Stack spacing={1}>
-          {neighborhoods.map(({ neighborhood, rows }) => (
-            <NeighborhoodAccordion key={neighborhood} neighborhood={neighborhood} rows={rows} />
+          {neighborhoods.map(({ key, neighborhood, rows }) => (
+            <NeighborhoodAccordion key={key} neighborhood={neighborhood} rows={rows} />
           ))}
         </Stack>
       )}
