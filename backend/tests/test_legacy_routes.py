@@ -4,7 +4,7 @@ routes, so they must keep working. Removed with them in the contract phase."""
 from sqlalchemy import select
 
 from app.legacy_town import LEGACY_TOWN_NAME
-from app.models import Pdr, Town, TownMember, User, WeightEntry
+from app.models import Pdr, Town, WeightEntry
 from tests.conftest import add_member, make_user
 
 
@@ -27,7 +27,6 @@ def test_legacy_reads_still_work(db, api):
         "/pdrs",
         "/pdrs/with-history",
         "/weights",
-        "/users",
         "/dashboard/stats",
         "/collections/current",
         "/collections/2026/1",
@@ -57,19 +56,6 @@ def test_legacy_writes_still_link_to_the_town(db, api):
     weight = client.post("/weights", json={"date": "2026-02-02", "plastic_type": "pet", "weight_lbs": 1})
     assert weight.status_code == 201
     assert db.get(WeightEntry, weight.json()["id"]).town_id == legacy_town.id
-
-
-def test_legacy_user_routes_keep_membership_in_sync(db, api):
-    user, legacy_town = _legacy_admin(db)
-    client = api.as_user(user)
-
-    created = client.post("/users", json={"email": "legacy-user@example.com", "role": "write"})
-    assert created.status_code == 201
-    new_user = db.scalar(select(User).where(User.email == "legacy-user@example.com"))
-    assert db.get(TownMember, (new_user.id, legacy_town.id)).role == "write"
-
-    assert client.put("/users/legacy-user@example.com", json={"role": "read"}).status_code == 200
-    assert db.get(TownMember, (new_user.id, legacy_town.id)).role == "read"
 
 
 def test_legacy_routes_stay_global_role_only(db, api, town_a):

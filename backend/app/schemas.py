@@ -186,31 +186,24 @@ Role = Literal["read", "write", "admin"]
 
 
 class UserOut(BaseModel):
-    """An active (provisioned) platform user."""
+    """An active account, as superadmins see it. Roles are per town: see the
+    members endpoints."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     email: str
     name: str | None
-    role: Role
+    is_superadmin: bool
     created_at: datetime
 
 
-class UserCreate(BaseModel):
-    """Create a user by email + role (active on first sign-in, matched by
-    email)."""
-
-    email: str = Field(min_length=3)
-    name: str | None = None
-    role: Role = "read"
-
-
-class UserUpdate(BaseModel):
-    """Update a user's role and/or name."""
+class AccountUpdate(BaseModel):
+    """Rename an account and/or grant or remove superadmin. Omitted fields are
+    left unchanged."""
 
     name: str | None = None
-    role: Role
+    is_superadmin: bool | None = None
 
 
 # --- Town members ---

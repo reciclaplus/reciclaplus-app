@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.town import Community, Neighborhood, Town
-from app.models.town_member import TownMember
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +25,6 @@ def legacy_town_id(db: Session) -> uuid.UUID | None:
     re-backfills, so a failed lookup must not block the write.
     """
     return db.execute(select(Town.id).where(Town.name == LEGACY_TOWN_NAME)).scalar_one_or_none()
-
-
-def sync_legacy_membership(db: Session, user_id: uuid.UUID, role: str) -> None:
-    """Mirror a role set through the legacy /users routes onto the user's
-    membership, so new routes see the same access while both exist."""
-    town_id = legacy_town_id(db)
-    if town_id is None:
-        return
-    member = db.get(TownMember, (user_id, town_id))
-    if member is None:
-        db.add(TownMember(user_id=user_id, town_id=town_id, role=role))
-    else:
-        member.role = role
 
 
 def resolve_neighborhood_id(

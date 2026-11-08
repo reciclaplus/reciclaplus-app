@@ -2,8 +2,18 @@
 
 import type { Role } from "@/lib/roles";
 
-export interface ActiveUser {
+/** An account, as superadmins see it (GET /users). */
+export interface Account {
   id: string;
+  email: string;
+  name: string | null;
+  is_superadmin: boolean;
+  created_at: string;
+}
+
+/** A user's access to one town (GET /towns/{id}/members). */
+export interface TownMember {
+  user_id: string;
   email: string;
   name: string | null;
   role: Role;
