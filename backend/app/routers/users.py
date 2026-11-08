@@ -1,8 +1,12 @@
-"""User & access management endpoints (admin only).
+"""Account management endpoints (superadmin only).
 
-Platform users are keyed by their own uuid and matched to a Google login by
-email (see app/auth.py), so admins create user rows directly here. A user can
-be added before they ever sign in; on first sign-in they are matched by email.
+An account is shared by every town its user belongs to, so these global actions
+are for superadmins: listing accounts, renaming, granting or removing superadmin,
+and deactivating. Town admins add and remove people in their own town through
+the members endpoints (app/routers/members.py), which also create accounts.
+
+Users are keyed by their own uuid and matched to a Google login by email (see
+app/auth.py).
 """
 
 from datetime import datetime, timezone
@@ -12,11 +16,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.activity_log import log_activity
-from app.auth import require_role
+from app.auth import require_superadmin
 from app.db import get_db
-from app.legacy_town import sync_legacy_membership
 from app.models.user import User
-from app.schemas import UserCreate, UserOut, UserUpdate
+from app.schemas import AccountUpdate, UserOut
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -31,89 +34,50 @@ def _find_user_by_email(db: Session, email: str) -> User:
     return user
 
 
-@router.get("", response_model=list[UserOut])
-def list_users(
-    db: Session = Depends(get_db),
-    _: User = Depends(require_role("admin")),
-) -> list[User]:
-    """List all active platform users (excludes deactivated ones)."""
-    return db.execute(
-        select(User).where(User.deleted_at.is_(None)).order_by(User.created_at)
-    ).scalars().all()
-
-
-@router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def create_user(
-    payload: UserCreate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_role("admin")),
-) -> User:
-    """Create a user by email + role. They gain access on their first sign-in
-    (matched by email).
-
-    If the email belongs to a previously deactivated user, reactivates that
-    account (clearing `deleted_at`) instead of failing on the unique
-    constraint — the `id` and any resources they created stay linked.
-    """
-    email = payload.email.strip().lower()
-    existing = db.execute(
-        select(User).where(func.lower(User.email) == email)
-    ).scalar_one_or_none()
-
-    if existing is not None and existing.deleted_at is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="User already exists"
-        )
-
-    if existing is not None:
-        existing.deleted_at = None
-        existing.name = payload.name
-        existing.role = payload.role
-        existing.created_by = admin.id
-        user = existing
-        action = "update"
-    else:
-        user = User(
-            email=email, name=payload.name, role=payload.role, created_by=admin.id
-        )
-        db.add(user)
-        action = "create"
-
-    db.flush()
-    sync_legacy_membership(db, user.id, payload.role)
+def _log(db: Session, actor: User, action: str, user: User) -> None:
+    # A global entry (no town): accounts are shared between towns.
     log_activity(
         db,
-        user_id=admin.id,
+        user_id=actor.id,
         action=action,
         resource_type="user",
         resource_id=user.id,
         resource_name=user.email,
     )
-    db.commit()
-    db.refresh(user)
-    return user
+
+
+@router.get("", response_model=list[UserOut])
+def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_superadmin),
+) -> list[User]:
+    """List all active accounts (excludes deactivated ones)."""
+    return db.execute(
+        select(User).where(User.deleted_at.is_(None)).order_by(User.created_at)
+    ).scalars().all()
 
 
 @router.put("/{email}", response_model=UserOut)
 def update_user(
     email: str,
-    payload: UserUpdate,
+    payload: AccountUpdate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_role("admin")),
+    superadmin: User = Depends(require_superadmin),
 ) -> User:
-    """Update a user's role and/or name."""
+    """Rename an account and/or grant or remove superadmin. Omitted fields are
+    left unchanged. A superadmin can't remove their own superadmin access."""
     user = _find_user_by_email(db, email)
-    user.role = payload.role
-    user.name = payload.name
-    sync_legacy_membership(db, user.id, payload.role)
-    log_activity(
-        db,
-        user_id=admin.id,
-        action="update",
-        resource_type="user",
-        resource_id=user.id,
-        resource_name=user.email,
-    )
+    changes = payload.model_dump(exclude_unset=True)
+    if "is_superadmin" in changes and changes["is_superadmin"] is not None:
+        if user.id == superadmin.id and not changes["is_superadmin"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No puedes quitarte el acceso de superadministrador.",
+            )
+        user.is_superadmin = changes["is_superadmin"]
+    if "name" in changes:
+        user.name = changes["name"]
+    _log(db, superadmin, "update", user)
     db.commit()
     db.refresh(user)
     return user
@@ -123,24 +87,18 @@ def update_user(
 def delete_user(
     email: str,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_role("admin")),
+    superadmin: User = Depends(require_superadmin),
 ) -> None:
-    """Deactivate a user: hides them from the user list and blocks sign-in,
-    but keeps their `id` intact so PDRs and activity logs they created stay
-    attributable. Admins cannot delete their own account."""
+    """Deactivate an account: blocks sign-in everywhere and hides it from member
+    lists, but keeps its `id` so PDRs and logs it created stay attributable. Only
+    a superadmin can reactivate it, by adding it to a town again. Superadmins
+    can't deactivate their own account."""
     user = _find_user_by_email(db, email)
-    if user.id == admin.id:
+    if user.id == superadmin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot delete your own account",
+            detail="No puedes desactivar tu propia cuenta.",
         )
     user.deleted_at = datetime.now(timezone.utc)
-    log_activity(
-        db,
-        user_id=admin.id,
-        action="delete",
-        resource_type="user",
-        resource_id=user.id,
-        resource_name=user.email,
-    )
+    _log(db, superadmin, "delete", user)
     db.commit()

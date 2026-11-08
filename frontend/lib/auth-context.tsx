@@ -2,8 +2,10 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -40,10 +42,17 @@ interface AuthState {
   status: AuthStatus;
 }
 
-const AuthContext = createContext<AuthState>({
+interface AuthContextValue extends AuthState {
+  /** Reload the user, e.g. after their towns change (a town created, archived
+   * or renamed). */
+  refresh: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   status: "loading",
+  refresh: async () => {},
 });
 
 /**
@@ -82,9 +91,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
+  const refresh = useCallback(async () => {
+    try {
+      const user = await apiFetch<CurrentUser>("/auth/me");
+      setState({ user, loading: false, status: "authenticated" });
+    } catch {
+      // Keep the current state: a failed refresh shouldn't sign anyone out.
+    }
+  }, []);
+
+  const value = useMemo(() => ({ ...state, refresh }), [state, refresh]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): AuthState {
+export function useAuth(): AuthContextValue {
   return useContext(AuthContext);
 }

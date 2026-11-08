@@ -7,12 +7,24 @@ import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
 import { PermissionGuard } from "@/components/PermissionGuard";
-import { UsersTab } from "@/components/admin/UsersTab";
-import { TownConfigTab } from "@/components/admin/TownConfigTab";
+import { AccountsTab } from "@/components/admin/AccountsTab";
+import { MembersTab } from "@/components/admin/MembersTab";
+import { ProjectsTab } from "@/components/admin/ProjectsTab";
+import { TownSettingsTab } from "@/components/admin/TownSettingsTab";
+import { useAuth } from "@/lib/auth-context";
 import { strings } from "@/lib/strings";
 
+type AdminTab = "members" | "settings" | "projects" | "accounts";
+
+/**
+ * Admin panel for the selected project: its users and settings. Superadmins
+ * also get the global tabs for all projects and all accounts. The backend
+ * enforces each of these independently.
+ */
 function AdminPanel() {
-  const [tab, setTab] = useState(0);
+  const { user } = useAuth();
+  const isSuperadmin = !!user?.is_superadmin;
+  const [tab, setTab] = useState<AdminTab>("members");
 
   return (
     <Stack spacing={2}>
@@ -21,14 +33,18 @@ function AdminPanel() {
       </Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-          <Tab label={strings.admin.tabUsers} />
-          <Tab label={strings.admin.tabTowns} />
+        <Tabs value={tab} onChange={(_, v: AdminTab) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
+          <Tab value="members" label={strings.admin.tabUsers} />
+          <Tab value="settings" label={strings.admin.tabTowns} />
+          {isSuperadmin && <Tab value="projects" label={strings.admin.tabProjects} />}
+          {isSuperadmin && <Tab value="accounts" label={strings.admin.tabAccounts} />}
         </Tabs>
       </Box>
 
-      {tab === 0 && <UsersTab />}
-      {tab === 1 && <TownConfigTab />}
+      {tab === "members" && <MembersTab />}
+      {tab === "settings" && <TownSettingsTab />}
+      {isSuperadmin && tab === "projects" && <ProjectsTab />}
+      {isSuperadmin && tab === "accounts" && <AccountsTab />}
     </Stack>
   );
 }
