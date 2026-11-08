@@ -94,9 +94,7 @@ def add_member(
     ).scalar_one_or_none()
 
     if user is None:
-        # users.role only drives the legacy unscoped routes, so a new account gets
-        # the lowest level there whatever its role in this town.
-        user = User(email=email, name=payload.name, role="read", created_by=access.user.id)
+        user = User(email=email, name=payload.name, created_by=access.user.id)
         db.add(user)
         db.flush()
     elif user.deleted_at is not None:

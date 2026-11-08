@@ -23,8 +23,6 @@ class UserMe(BaseModel):
     id: uuid.UUID
     email: str
     name: str | None
-    # Legacy global role, removed in the multi-town contract phase. Use `towns`.
-    role: str
     is_superadmin: bool
     towns: list[UserTown]
 
@@ -70,26 +68,6 @@ class TownDetail(TownSummary):
 
 # --- PDRs ---
 
-class PdrCreate(BaseModel):
-    name: str = Field(min_length=1)
-    description: str | None = None
-    community: str = Field(min_length=1)
-    neighborhood: str = Field(min_length=1)
-    category: str = Field(min_length=1)
-    lat: float
-    lng: float
-
-
-class PdrUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    community: str | None = None
-    neighborhood: str | None = None
-    category: str | None = None
-    lat: float | None = None
-    lng: float | None = None
-
-
 class PdrOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -103,9 +81,9 @@ class PdrOut(BaseModel):
     lat: float
     lng: float
     created_at: datetime
-    town_id: uuid.UUID | None = None
-    neighborhood_id: uuid.UUID | None = None
-    community_id: uuid.UUID | None = None
+    town_id: uuid.UUID
+    neighborhood_id: uuid.UUID
+    community_id: uuid.UUID
 
 
 class TownPdrCreate(BaseModel):
@@ -162,8 +140,8 @@ class CollectionPassRow(BaseModel):
     category: str
     route_order: int | None = None
     status: CollectionStatus | None
-    neighborhood_id: uuid.UUID | None = None
-    community_id: uuid.UUID | None = None
+    neighborhood_id: uuid.UUID
+    community_id: uuid.UUID
 
 
 class CollectionEntry(BaseModel):
@@ -254,21 +232,6 @@ class NameWrite(BaseModel):
 
 
 # --- Weight entries ---
-
-PlasticType = Literal["pet", "hdpe", "pp", "trash"]
-
-
-class WeightEntryCreate(BaseModel):
-    date: str = Field(description="ISO date string (YYYY-MM-DD)")
-    plastic_type: PlasticType
-    weight_lbs: float = Field(gt=0)
-
-
-class WeightEntryUpdate(BaseModel):
-    date: str | None = Field(default=None, description="ISO date string (YYYY-MM-DD)")
-    plastic_type: PlasticType | None = None
-    weight_lbs: float | None = Field(default=None, gt=0)
-
 
 class TownWeightEntryCreate(BaseModel):
     """plastic_type is validated against the town's own list."""

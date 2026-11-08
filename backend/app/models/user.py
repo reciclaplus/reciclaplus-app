@@ -1,7 +1,7 @@
-"""User model — mirrors the `users` table (PRD §6).
+"""User model — mirrors the `users` table.
 
-`users.id` references Supabase Auth's `auth.users` table, linking platform
-roles to authenticated identities.
+A user is matched to a Supabase Auth identity by email (not by id). Access is
+per town, through town_members; `is_superadmin` grants admin in every town.
 """
 
 import uuid
@@ -22,7 +22,6 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
-    role: Mapped[str] = mapped_column(String, nullable=False, default="read")
     is_superadmin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=false()
     )

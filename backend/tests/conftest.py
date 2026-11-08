@@ -4,11 +4,16 @@ Tests run against a real Postgres database named by TEST_DATABASE_URL, migrated
 with supabase/migrations/. They are skipped if it isn't set, and refuse to run
 against production. The test database is shared between worktrees, so each test
 runs inside a transaction that is always rolled back.
+
+To test a migration before applying it to the shared database, list its file(s)
+in TEST_PENDING_MIGRATIONS (comma-separated): each test applies them inside its
+own transaction first, so they're rolled back with everything else.
 """
 
 import os
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -37,10 +42,21 @@ def engine():
     engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def pending_migrations() -> list[str]:
+    """SQL of migrations to apply, rolled back, in every test (see module doc)."""
+    paths = [p.strip() for p in os.environ.get("TEST_PENDING_MIGRATIONS", "").split(",") if p.strip()]
+    return [Path(p).read_text(encoding="utf-8") for p in paths]
+
+
 @pytest.fixture
-def connection(engine):
+def connection(engine, pending_migrations):
     with engine.connect() as conn:
         transaction = conn.begin()
+        for sql in pending_migrations:
+            # Through the driver directly: migration SQL may contain "%", which
+            # SQLAlchemy would read as parameter markers.
+            conn.connection.driver_connection.execute(sql)
         yield conn
         transaction.rollback()
 
@@ -91,7 +107,7 @@ class TownFixture:
 # failed write has to leave it in place here too.
 
 def make_user(db: Session, *, superadmin: bool = False) -> User:
-    user = User(email=f"test-{uuid.uuid4().hex}@example.com", role="read", is_superadmin=superadmin)
+    user = User(email=f"test-{uuid.uuid4().hex}@example.com", is_superadmin=superadmin)
     db.add(user)
     db.commit()
     return user
@@ -116,8 +132,6 @@ def make_town(db: Session) -> TownFixture:
     db.flush()
     pdr = Pdr(
         name=f"PDR {suffix}",
-        community=community.name,
-        neighborhood=neighborhood.name,
         category="casa",
         lat=18.0,
         lng=-70.0,

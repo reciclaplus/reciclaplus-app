@@ -12,17 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import (
     auth,
-    collections,
-    dashboard,
     members,
-    pdrs,
     town_collections,
     town_dashboard,
     town_pdrs,
     town_weights,
     towns,
     users,
-    weights,
 )
 
 app = FastAPI(title="ReciclApp API")
@@ -43,12 +39,7 @@ app.include_router(town_pdrs.router)
 app.include_router(town_collections.router)
 app.include_router(town_weights.router)
 app.include_router(town_dashboard.router)
-# Legacy unscoped routes, removed in the multi-town contract phase.
-app.include_router(pdrs.router)
-app.include_router(collections.router)
 app.include_router(users.router)
-app.include_router(dashboard.router)
-app.include_router(weights.router)
 
 
 @app.get("/health", tags=["health"])

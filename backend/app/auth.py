@@ -22,7 +22,8 @@ from app.models.town import Community, Neighborhood, Town
 from app.models.town_member import TownMember
 from app.models.user import User
 
-# Hierarchical roles: each inherits the permissions of those below it.
+# Hierarchical roles within a town: each inherits the permissions of those
+# below it. A user's role in each town comes from town_members.
 ROLE_LEVELS: dict[str, int] = {"read": 0, "write": 1, "admin": 2}
 
 bearer_scheme = HTTPBearer(auto_error=True)
@@ -98,25 +99,6 @@ def get_current_user(
             detail="User is not provisioned in this platform",
         )
     return user
-
-
-def require_role(minimum: str):
-    """Dependency factory enforcing a minimum global role (hierarchical).
-
-    Legacy: only for the unscoped routes, removed in the multi-town contract
-    phase. New routes use require_town_role.
-    """
-    required_level = ROLE_LEVELS[minimum]
-
-    def checker(user: User = Depends(get_current_user)) -> User:
-        if ROLE_LEVELS.get(user.role, -1) < required_level:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Requires '{minimum}' role",
-            )
-        return user
-
-    return checker
 
 
 @dataclass(frozen=True)

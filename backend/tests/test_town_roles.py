@@ -276,7 +276,7 @@ def test_same_barrio_name_in_two_communities_stays_separate(db, api, town_a):
     db.add(twin)
     db.flush()
     db.add(Pdr(
-        name="twin", community="Otra", neighborhood=twin.name, category="casa",
+        name="twin", category="casa",
         lat=18, lng=-70, town_id=town_a.town.id, neighborhood_id=twin.id,
     ))
     db.flush()
@@ -301,9 +301,8 @@ def test_add_member_creates_account(db, api, town_a):
     body = response.json()
     assert (body["email"], body["name"], body["role"]) == ("new@example.com", "Ana", "admin")
 
-    # The account gets no power on the legacy global routes.
+    # Town admin of one town, not a superadmin.
     created = db.scalar(select(User).where(User.email == "new@example.com"))
-    assert created.role == "read"
     assert created.is_superadmin is False
     assert _logs(db, town_a.town.id, "member")[0].resource_name == "new@example.com"
 
@@ -452,7 +451,7 @@ def test_mutations_log_their_town(db, api, town_a, town_b):
 
 def test_collection_save_logs_one_entry_per_save(db, api, town_a):
     second = Pdr(
-        name="second", community="Centro", neighborhood="Barrio", category="casa", lat=18, lng=-70,
+        name="second", category="casa", lat=18, lng=-70,
         town_id=town_a.town.id, neighborhood_id=town_a.neighborhood.id,
     )
     db.add(second)

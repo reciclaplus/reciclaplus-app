@@ -25,17 +25,9 @@ UNSCOPED_ROUTES = {
     "/communities/{community_id}",
     "/communities/{community_id}/neighborhoods",
     "/neighborhoods/{neighborhood_id}",
-    # Legacy: removed in the multi-town contract phase.
-    "/collections/current",
-    "/collections/{year}/{week}",
-    "/dashboard/stats",
-    "/pdrs",
-    "/pdrs/with-history",
-    "/pdrs/{pdr_id}",
+    # Global, superadmin only: covered by test_accounts.py.
     "/users",
     "/users/{email}",
-    "/weights",
-    "/weights/{entry_id}",
 }
 
 

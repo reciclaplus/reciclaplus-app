@@ -1,7 +1,7 @@
 """Pickup point (PDR) model — mirrors the pdrs table.
 
-community/neighborhood/category are stored as the selected values (per PRD);
-the town-config tables drive the form dropdowns.
+A PDR belongs to a town and a barrio (neighborhood); its community comes from
+the barrio. `category` is free text, validated against the town's list when set.
 """
 
 import uuid
@@ -27,16 +27,12 @@ class Pdr(Base):
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
-    community: Mapped[str] = mapped_column(String, nullable=False)
-    neighborhood: Mapped[str] = mapped_column(String, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
-    # Nullable until the multi-town contract phase, which also drops the
-    # community/neighborhood text columns above.
-    town_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("towns.id", ondelete="RESTRICT"), nullable=True
+    town_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("towns.id", ondelete="RESTRICT"), nullable=False
     )
-    neighborhood_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("neighborhoods.id", ondelete="RESTRICT"), nullable=True
+    neighborhood_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("neighborhoods.id", ondelete="RESTRICT"), nullable=False
     )
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lng: Mapped[float] = mapped_column(Float, nullable=False)
@@ -53,4 +49,4 @@ class Pdr(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    location: Mapped[Neighborhood | None] = relationship()
+    location: Mapped[Neighborhood] = relationship()

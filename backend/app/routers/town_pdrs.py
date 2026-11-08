@@ -40,24 +40,23 @@ def get_town_pdr(db: Session, town_id: uuid.UUID, pdr_id: uuid.UUID) -> Pdr:
 
 
 def _pdr_fields(pdr: Pdr) -> dict:
-    """A PDR's response fields, with its location names read from its links so a
-    renamed barrio is always current. Falls back to the stored text for a PDR not
-    yet linked; the contract phase removes that case."""
+    """A PDR's response fields. Its community and barrio names are read through
+    its barrio link, so a renamed barrio is always current."""
     location = pdr.location
     return {
         "id": pdr.id,
         "internal_id": pdr.internal_id,
         "name": pdr.name,
         "description": pdr.description,
-        "community": location.community.name if location else pdr.community,
-        "neighborhood": location.name if location else pdr.neighborhood,
+        "community": location.community.name,
+        "neighborhood": location.name,
         "category": pdr.category,
         "lat": pdr.lat,
         "lng": pdr.lng,
         "created_at": pdr.created_at,
         "town_id": pdr.town_id,
         "neighborhood_id": pdr.neighborhood_id,
-        "community_id": location.community_id if location else None,
+        "community_id": location.community_id,
     }
 
 
@@ -181,9 +180,6 @@ def create_pdr(
         lng=payload.lng,
         town_id=access.town.id,
         neighborhood_id=neighborhood.id,
-        # The old text columns are required until the contract phase drops them.
-        community=neighborhood.community.name,
-        neighborhood=neighborhood.name,
         created_by=access.user.id,
     )
     db.add(pdr)
@@ -213,10 +209,7 @@ def update_pdr(
     changes = payload.model_dump(exclude_none=True)
     neighborhood_id = changes.pop("neighborhood_id", None)
     if neighborhood_id is not None:
-        neighborhood = _resolve_neighborhood(db, access.town.id, neighborhood_id)
-        pdr.neighborhood_id = neighborhood.id
-        pdr.community = neighborhood.community.name
-        pdr.neighborhood = neighborhood.name
+        pdr.neighborhood_id = _resolve_neighborhood(db, access.town.id, neighborhood_id).id
     if "category" in changes and changes["category"] != pdr.category:
         _check_category(access.town, changes["category"])
     for field, value in changes.items():
